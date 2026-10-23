@@ -101,6 +101,7 @@ export interface Listing extends RawListing {
   version: string | null;
   edition: string | null;
   lang: string | null;
+  condition?: string | null;
 }
 
 /** Una versión concreta de una carta: mismo código + rareza + variante (Alter, Foil, Gold...) */
@@ -111,6 +112,10 @@ export interface CardGroup {
   rarity: string | null;
   version: string | null;
   setName: string | null;
+  /** idioma que separa esta versión (null = inglés o la tienda no lo dice) */
+  lang?: string | null;
+  /** el nombre o el código coincide exacto con lo buscado */
+  exact?: boolean;
   info: CardInfo | null;
   listings: (Listing & { info: CardInfo | null })[];
 }
@@ -149,6 +154,8 @@ export interface SearchResponse {
   missing: MissingVersion[];
   /** la base oficial reconoce el nombre o código buscado */
   known: boolean;
+  /** si no hubo resultados: nombres parecidos para probar */
+  didYouMean?: string[];
 }
 
 /** Una publicación guardada en el catálogo indexado */

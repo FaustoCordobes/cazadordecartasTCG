@@ -4,7 +4,7 @@
 create table if not exists catalogo (
   id            bigserial primary key,
   store_id      text        not null,
-  game          text        not null check (game in ('ygo', 'digi')),
+  game          text        not null check (game in ('ygo', 'digi', 'mtg', 'pkm', 'op')),
   title         text        not null,
   title_norm    text        not null,  -- título en minúsculas y sin acentos, para buscar
   url           text        not null,

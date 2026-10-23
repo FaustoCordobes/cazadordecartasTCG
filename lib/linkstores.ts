@@ -96,6 +96,9 @@ export const LINK_STORES: LinkStore[] = [
   },
 ];
 
+/** Fecha de la última revisión manual del directorio (webs, juegos, robots.txt) */
+export const DIRECTORY_REVIEWED = "2026-10-23";
+
 /** Link para buscar una carta en una tienda del directorio (o su página del juego) */
 export function linkFor(s: LinkStore, game: Game, q?: string): string {
   if (q && s.searchUrl) return s.searchUrl.replace("{q}", encodeURIComponent(q.trim()));

@@ -2,7 +2,8 @@ import type { CardGroup, CardInfo, Game, Listing, MissingVersion, RawListing, Se
 import { STORES } from "./stores.ts";
 import { LIVE_ADAPTERS } from "./adapters/index.ts";
 import { robotsAllows } from "./robots.ts";
-import { digiImage, lookupInfo, mtgEnglishName, ygoEnglishName, type InfoIndex } from "./cardinfo.ts";
+import { digiImage, lookupInfo, mtgEnglishName, mtgFuzzyName, ygoEnglishName, type InfoIndex } from "./cardinfo.ts";
+import { suggest } from "./suggest.ts";
 import { SEALED } from "./games.ts";
 import { matchesQuery, mtgRarity, norm, parseTitle, pkmRarity } from "./parse.ts";
 import { TTLCache } from "./cache.ts";
@@ -106,9 +107,62 @@ export function toListings(game: Game, store: StoreConfig, platform: Listing["pl
   return out;
 }
 
+/** Idioma que separa versiones: solo cuando la tienda lo dice y no es inglés (inglés y "sin dato" van juntos) */
+const langKey = (lang: string | null | undefined) => (lang && lang !== "Inglés" ? lang : "");
+
+/**
+ * Agrupa por VERSIÓN: cada impresión (código + rareza + variante + idioma) es una tarjeta aparte, así
+ * Kimeramon BT19-070, BT8-084 y EX9-074 Alter aparecen por separado y una carta en japonés no se compara
+ * con una en inglés. La condición (NM/LP...) se muestra por publicación y se avisa si se mezclan.
+ */
+export function groupListings(game: Game, listings: Listing[], idx: InfoIndex, query: string, q = query): CardGroup[] {
+  const groups = new Map<string, CardGroup>();
+  const wanted = norm(query).replace(/[^a-z0-9]+/g, " ").trim();
+  const wantedQ = norm(q).replace(/[^a-z0-9]+/g, " ").trim();
+  for (const l of listings) {
+    const info = attachInfo(game, l, idx);
+    const name = info?.name ?? l.parsedName;
+    const rarity = l.rarity ?? info?.rarity ?? null;
+    const variant = game === "ygo" ? l.version : l.version && l.version !== "Normal" ? l.version : null;
+    const lk = game === "ygo" ? "" : langKey(l.lang);
+    // Magic: la misma carta en distintas tiendas casi nunca trae código igual; se agrupa por nombre, set y acabado
+    const k =
+      game === "mtg" ? [norm(name), norm(l.set), variant ?? "", lk].join("|")
+      : game === "pkm" ? [norm(name), l.code ?? norm(l.set), variant ?? "", lk].join("|")
+      : l.code ? [l.code.toUpperCase(), rarity ?? "", variant ?? "", lk].join("|")
+      : [norm(name), rarity ?? "", variant ?? "", norm(l.set), lk].join("|");
+    if (!groups.has(k)) {
+      const n = norm(name).replace(/[^a-z0-9]+/g, " ").trim();
+      const exact = n === wanted || n === wantedQ || (!!l.code && (l.code.toUpperCase() === q.trim().toUpperCase()));
+      groups.set(k, { key: k, name, code: l.code, rarity, version: variant, setName: l.set, lang: lk || null, exact, info, listings: [] });
+    }
+    const g = groups.get(k)!;
+    if (!g.info && info) g.info = info;
+    g.listings.push({ ...l, info });
+  }
+  const cards = [...groups.values()];
+  for (const c of cards) {
+    c.listings.sort(
+      (a, b) =>
+        Number(b.available === true) - Number(a.available === true) ||
+        Number(b.available === null) - Number(a.available === null) ||
+        a.price - b.price
+    );
+  }
+  return cards;
+}
+
+export interface SearchProgress {
+  done: number;
+  total: number;
+  stores: StoreStatus[];
+  /** resultados parciales (con las tiendas que ya respondieron) */
+  cards: CardGroup[];
+}
+
 const NET_ERR = (msg: string) => (msg === "fetch failed" || !msg ? "No se pudo conectar con la tienda" : msg);
 
-export async function searchAll(game: Game, q: string): Promise<SearchResponse> {
+export async function searchAll(game: Game, q: string, onProgress?: (p: SearchProgress) => void): Promise<SearchResponse> {
   const key = `${game}:${norm(q)}`;
   const cached = searchCache.get(key);
   if (cached) return cached;
@@ -127,6 +181,21 @@ export async function searchAll(game: Game, q: string): Promise<SearchResponse> 
   const statuses: StoreStatus[] = [];
   const listings: Listing[] = [];
   const indexStores: { store: StoreConfig; platform: Listing["platform"] }[] = [];
+
+  // Avisos de avance: cada vez que responde una tienda (los resultados parciales, como mucho cada 600 ms)
+  let lastCards = 0;
+  const progress = () => {
+    if (!onProgress) return;
+    const now = Date.now();
+    const withCards = now - lastCards > 600;
+    if (withCards) lastCards = now;
+    onProgress({
+      done: statuses.length,
+      total: stores.length,
+      stores: [...statuses],
+      cards: withCards ? groupListings(game, listings, idxQuery, query, q) : [],
+    });
+  };
 
   // 2) Tiendas en vivo: todas al mismo tiempo
   await Promise.all(
@@ -162,6 +231,7 @@ export async function searchAll(game: Game, q: string): Promise<SearchResponse> 
       } catch (e) {
         statuses.push({ ...base, ms: Date.now() - t0, error: NET_ERR((e as Error).message) });
       }
+      progress();
     })
   );
 
@@ -183,6 +253,7 @@ export async function searchAll(game: Game, q: string): Promise<SearchResponse> 
           error: !st ? "Su catálogo todavía no se indexó" : st.error ?? undefined,
         });
       }
+      progress();
     } catch (e) {
       for (const { store } of indexStores) {
         statuses.push({
@@ -197,36 +268,8 @@ export async function searchAll(game: Game, q: string): Promise<SearchResponse> 
   const names = [...new Set([query, ...listings.map((l) => l.parsedName)])].slice(0, 6);
   const idx = await lookupInfo(game, names);
 
-  // 5) Agrupar por VERSIÓN: cada impresión (código + rareza + variante) es una tarjeta aparte.
-  //    Así Kimeramon BT19-070, BT8-084 y EX9-074 Alter aparecen por separado.
-  const groups = new Map<string, CardGroup>();
-  for (const l of listings) {
-    const info = attachInfo(game, l, idx);
-    const name = info?.name ?? l.parsedName;
-    const rarity = l.rarity ?? info?.rarity ?? null;
-    const variant = game === "ygo" ? l.version : l.version && l.version !== "Normal" ? l.version : null;
-    // Magic: la misma carta en distintas tiendas casi nunca trae código igual; se agrupa por nombre, set y acabado
-    const k =
-      game === "mtg" ? [norm(name), norm(l.set), variant ?? ""].join("|")
-      : game === "pkm" ? [norm(name), l.code ?? norm(l.set), variant ?? ""].join("|")
-      : l.code ? [l.code.toUpperCase(), rarity ?? "", variant ?? ""].join("|")
-      : [norm(name), rarity ?? "", variant ?? "", norm(l.set)].join("|");
-    if (!groups.has(k)) {
-      groups.set(k, { key: k, name, code: l.code, rarity, version: variant, setName: l.set, info, listings: [] });
-    }
-    const g = groups.get(k)!;
-    if (!g.info && info) g.info = info;
-    g.listings.push({ ...l, info });
-  }
-  const cards = [...groups.values()];
-  for (const c of cards) {
-    c.listings.sort(
-      (a, b) =>
-        Number(b.available === true) - Number(a.available === true) ||
-        Number(b.available === null) - Number(a.available === null) ||
-        a.price - b.price
-    );
-  }
+  // 5) Agrupar por VERSIÓN (ver groupListings)
+  const cards = groupListings(game, listings, idx, query, q);
 
   // 6) Digimon: versiones que existen (base oficial) pero ninguna tienda tiene publicadas
   const missing: MissingVersion[] = [];
@@ -243,10 +286,24 @@ export async function searchAll(game: Game, q: string): Promise<SearchResponse> 
     missing.sort((a, b) => a.code.localeCompare(b.code, "en", { numeric: true }));
   }
 
+  // 7) Sin resultados: sugerencias de nombres parecidos (tolerante a errores de tipeo)
+  let didYouMean: string[] = [];
+  if (!cards.length && !looksLikeCode(q)) {
+    try {
+      const sug = await suggest(game, q.trim().slice(0, 40));
+      didYouMean = sug.map((x) => x.alt && game === "mtg" ? x.alt : x.name).filter((n) => norm(n) !== norm(query)).slice(0, 4);
+      if (!didYouMean.length && game === "mtg") {
+        const fz = await mtgFuzzyName(q);
+        if (fz && norm(fz) !== norm(query)) didYouMean = [fz];
+      }
+    } catch { /* sin sugerencias */ }
+  }
+
   const res: SearchResponse = {
     game,
     q,
     query,
+    didYouMean,
     searchedAt: new Date().toISOString(),
     stores: statuses.sort((a, b) => Number(b.ok) - Number(a.ok) || b.count - a.count || a.name.localeCompare(b.name)),
     cards,

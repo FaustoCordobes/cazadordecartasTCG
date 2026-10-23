@@ -6,6 +6,7 @@ import type { Game } from "@/lib/types.ts";
 interface Suggestion {
   name: string;
   alt?: string;
+  image?: string;
 }
 
 /** Campo de texto que sugiere el nombre completo de la carta mientras se escribe */
@@ -29,7 +30,7 @@ export function Autocomplete({
     if (skip.current) { skip.current = false; return; }
     const term = value.trim();
     // no sugerir si parece un código (BT2-077)
-    if (term.length < 3 || /^[a-z0-9]{2,5}-[a-z0-9]{2,6}$/i.test(term)) { setItems([]); return; }
+    if (term.length < 2 || /^[a-z0-9]{2,5}-[a-z0-9]{2,6}$/i.test(term)) { setItems([]); return; }
     const ctrl = new AbortController();
     const t = setTimeout(async () => {
       try {
@@ -77,12 +78,13 @@ export function Autocomplete({
         <ul className="ac-list" id={`${id}-list`} role="listbox">
           {items.map((s, i) => (
             <li
-              key={s.name} id={`${id}-opt-${i}`} role="option" aria-selected={i === active}
+              key={s.name + (s.alt ?? "")} id={`${id}-opt-${i}`} role="option" aria-selected={i === active}
               className={i === active ? "on" : ""}
               onMouseDown={(e) => { e.preventDefault(); pick(s); }}
               onMouseEnter={() => setActive(i)}
             >
-              {s.name}{s.alt && s.alt !== s.name ? <small> · {s.alt}</small> : null}
+              {s.image ? <img src={s.image} alt="" width={24} height={34} loading="lazy" referrerPolicy="no-referrer" onError={(e) => { (e.currentTarget as HTMLImageElement).style.visibility = "hidden"; }} /> : <span className="ac-noimg" aria-hidden="true" />}
+              <span>{s.name}{s.alt && s.alt !== s.name ? <small> · {s.alt}</small> : null}</span>
             </li>
           ))}
         </ul>

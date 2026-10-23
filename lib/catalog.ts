@@ -2,6 +2,7 @@ import { promises as fs } from "node:fs";
 import path from "node:path";
 import type { CatalogItem, Game } from "./types.ts";
 import { norm } from "./parse.ts";
+import { supabase, type SupaCall } from "./supa.ts";
 
 /**
  * Catálogo de las tiendas indexadas (Tiendanube, PrestaShop y las WooCommerce que bloquean su API).
@@ -56,23 +57,7 @@ const fileBackend: CatalogBackend = {
   },
 };
 
-// ---------- Supabase (API REST, sin dependencias) ----------
-function supabase() {
-  const url = process.env.SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_KEY;
-  if (!url || !key) return null;
-  // Claves nuevas (sb_secret_...) van solo en "apikey"; las legacy (JWT eyJ...) también en Authorization
-  const headers: Record<string, string> = key.startsWith("sb_")
-    ? { apikey: key, "Content-Type": "application/json" }
-    : { apikey: key, Authorization: `Bearer ${key}`, "Content-Type": "application/json" };
-  const call = async (p: string, init: RequestInit = {}) => {
-    const res = await fetch(`${url}/rest/v1/${p}`, { ...init, headers: { ...headers, ...(init.headers ?? {}) }, cache: "no-store" });
-    if (!res.ok) throw new Error(`Supabase respondió ${res.status}: ${await res.text()}`);
-    return res;
-  };
-  return call;
-}
-
+// ---------- Supabase ----------
 type Row = {
   store_id: string; game: Game; title: string; title_norm: string; url: string; price: number;
   compare_price: number | null; available: boolean | null; stock: number | null; image: string | null; indexed_at: string;
@@ -87,7 +72,7 @@ const fromRow = (r: Row): CatalogItem => ({
   comparePrice: r.compare_price, available: r.available, stock: r.stock, image: r.image ?? undefined, indexedAt: r.indexed_at,
 });
 
-function supabaseBackend(call: NonNullable<ReturnType<typeof supabase>>): CatalogBackend {
+function supabaseBackend(call: SupaCall): CatalogBackend {
   return {
     async replaceStore(storeId, game, items, status) {
       if (!status.error) {

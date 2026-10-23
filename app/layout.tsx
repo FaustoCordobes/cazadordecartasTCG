@@ -6,8 +6,9 @@ const DESCRIPTION = "Buscá una carta de Yu-Gi-Oh!, Digimon, Magic, Pokémon o O
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),
-  title: "Cazacartas TCG",
+  title: { default: "Cazacartas TCG — precios de cartas en tiendas de Argentina", template: "%s | Cazacartas" },
   description: DESCRIPTION,
+  alternates: { canonical: "/" },
   applicationName: "Cazacartas",
   appleWebApp: { capable: true, title: "Cazacartas", statusBarStyle: "black-translucent" },
   icons: { icon: "/icon-192.png", apple: "/apple-touch-icon.png" },

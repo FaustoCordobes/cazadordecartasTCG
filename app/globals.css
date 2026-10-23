@@ -336,3 +336,153 @@ html{background:var(--bg); transition:background-color .2s}
 .donar-hint{font-size:.8rem; color:var(--muted)}
 .alias-mp{font-family:var(--f-mono); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:1px 6px}
 @media (max-width:520px){.donar-acciones{width:100%}}
+
+/* v8: ¿Qué es Cazacartas? */
+.que-es{background:var(--surface); border:1px solid var(--line); border-radius:var(--r)}
+.que-es summary{list-style:none; cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:10px; padding:12px 16px; font-family:var(--f-display); font-weight:600; font-size:1rem}
+.que-es summary::-webkit-details-marker{display:none}
+.que-es-ver{flex:none; font-family:var(--f-body); font-size:.78rem; font-weight:600; color:var(--accent); border:1px solid var(--line); border-radius:99px; padding:2px 10px}
+.que-es[open] .que-es-ver{font-size:0}
+.que-es[open] .que-es-ver::after{content:"Cerrar"; font-size:.78rem}
+.que-es-body{padding:0 16px 16px; display:flex; flex-direction:column; gap:12px}
+.que-es-body p{margin:0}
+.que-es-list{list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:8px}
+.que-es-list li{display:flex; gap:10px; align-items:flex-start; background:var(--surface-2); border-radius:8px; padding:10px 12px; font-size:.9rem}
+.que-es-list li > span{font-size:1.15rem; line-height:1.2}
+.que-es-tiendas{border-left:3px solid var(--good); background:var(--good-soft); border-radius:0 8px 8px 0; padding:12px 14px; display:flex; flex-direction:column; gap:8px; font-size:.9rem}
+.que-es-tiendas h3{font-size:.98rem}
+
+/* ===== v9: mejoras de búsqueda, comparación, optimizador, listas y accesibilidad ===== */
+.sr-only{position:absolute; width:1px; height:1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap}
+.skip{position:absolute; left:-999px; top:8px; background:var(--accent); color:var(--on-accent); padding:8px 12px; border-radius:8px; z-index:50}
+.skip:focus{left:8px}
+:focus-visible{outline:3px solid var(--accent); outline-offset:2px}
+.btn, .theme-btn, .tabs button, .dir-chip, .o-go, .o-add, .o-rep, .quick button, .chip, select, input, textarea{min-height:44px}
+.btn-sm, .quick button, .chip, .dir-chip{min-height:36px}
+.top-actions a.theme-btn{text-decoration:none; color:var(--ink)}
+.seo-intro{margin:0; color:var(--muted)}
+
+/* guía 1-2-3 */
+.onb{display:flex; align-items:center; justify-content:space-between; gap:8px 16px; flex-wrap:wrap; background:var(--accent-soft); border-radius:var(--r); padding:10px 14px; font-size:.88rem}
+.onb ol{list-style:none; margin:0; padding:0; display:flex; gap:6px 18px; flex-wrap:wrap}
+.onb li{display:flex; align-items:center; gap:6px}
+.onb li b{display:inline-grid; place-items:center; width:22px; height:22px; border-radius:50%; background:var(--accent); color:var(--on-accent); font-size:.75rem}
+
+/* selector de juego compacto en celular */
+@media (max-width:560px){
+  .games{display:flex; overflow-x:auto; gap:8px; padding-bottom:4px; scroll-snap-type:x mandatory}
+  .game{flex:0 0 auto; padding:8px 12px; scroll-snap-align:start}
+  .game small{display:none}
+  .game strong{font-size:.95rem}
+  .emb{width:32px; height:32px; font-size:.75rem}
+  .top-actions .theme-btn span:last-child{display:none}
+  .top-actions .theme-btn{padding:6px 10px}
+}
+
+/* filtros plegables */
+.filters{border:1px solid var(--line); border-radius:var(--r); padding:0 12px; background:var(--surface)}
+.filters > summary{cursor:pointer; padding:12px 0; font-weight:600; min-height:44px; display:flex; align-items:center}
+.filters[open]{padding-bottom:12px}
+.sort-note{margin:-6px 0 8px; font-size:.78rem; color:var(--muted)}
+.popular{margin-top:-6px}
+
+/* resultados */
+.card-actions{display:flex; gap:6px; flex-wrap:wrap}
+.tag.match{background:var(--good-soft); color:var(--good); border-color:transparent; font-weight:600}
+.tag.partial{background:var(--surface-2); color:var(--muted); border-style:dashed}
+.tag.only{background:var(--info-soft); color:var(--info); border-color:transparent; font-weight:600}
+.tag.cond{font-family:var(--f-mono)}
+.tag.cash{background:var(--good-soft); color:var(--good); border-color:transparent}
+.warn-inline{margin:0; font-size:.82rem; color:var(--ink); background:var(--bad-soft); border-radius:8px; padding:8px 10px}
+.usd{color:var(--muted)!important; font-size:.72rem!important}
+.offer-head{background:var(--surface-2); font-size:.72rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); padding:6px 12px}
+.o-stock.low{color:var(--bad); font-weight:600}
+.o-actions{display:flex; flex-direction:column; gap:4px; align-items:stretch}
+.o-rep{background:none; border:0; color:var(--muted); font-size:.75rem; text-decoration:underline; cursor:pointer; min-height:32px}
+.o-rep:hover{color:var(--accent)}
+.sbadge.err{color:var(--bad)}
+.empty-tips{text-align:left; margin:10px auto 0; max-width:560px; display:grid; gap:6px; padding-left:18px}
+.skel{background:linear-gradient(90deg,var(--surface-2),var(--line),var(--surface-2)); background-size:200% 100%; animation:skel 1.2s infinite linear; border-radius:6px; height:14px}
+@keyframes skel{to{background-position:-200% 0}}
+.skel-card{min-height:140px}
+.thumb-skel{aspect-ratio:59/86; height:auto}
+.skel-lines{display:grid; gap:10px; align-content:start}
+.skel-lines .skel:nth-child(1){width:60%; height:20px}
+.skel-lines .skel:nth-child(3){width:40%}
+@media (prefers-reduced-motion:reduce){.skel{animation:none}}
+@media (max-width:860px){ .offer-head{display:none} }
+
+/* historial */
+.hist{border:1px solid var(--line); border-radius:8px; padding:10px 12px; display:grid; gap:8px; color:var(--accent)}
+.hist p, .hist b, .hist-f{color:var(--ink)}
+.hist-h{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap}
+.hist-svg{width:100%; height:auto; max-height:120px}
+.hist-f{display:flex; justify-content:space-between; gap:8px; font-size:.75rem; flex-wrap:wrap; color:var(--muted)}
+.seg{display:inline-flex; border:1px solid var(--line); border-radius:8px; overflow:hidden}
+.seg button{background:var(--surface); border:0; padding:6px 10px; font-size:.78rem; cursor:pointer; min-height:36px}
+.seg button.on{background:var(--accent); color:var(--on-accent)}
+
+/* diálogo de reportes */
+.dialog{border:1px solid var(--line); border-radius:12px; background:var(--surface); color:var(--ink); padding:18px; width:min(480px, calc(100vw - 32px)); max-height:calc(100dvh - 32px); overflow:auto}
+.dialog::backdrop{background:rgba(0,0,0,.45)}
+.dialog h2{font-size:1.15rem; margin-bottom:6px}
+.dialog-x{position:absolute; right:10px; top:8px}
+.dialog-x button{background:none; border:0; font-size:1.6rem; cursor:pointer; color:var(--muted); min-height:44px; min-width:44px}
+.dialog{position:fixed}
+.rep-form{display:grid; gap:12px}
+.rep-form textarea, .rep-form input, .rep-form select{width:100%}
+.hp{position:absolute; left:-9999px; width:1px; height:1px; opacity:0}
+.ok-box{background:var(--good-soft); color:var(--ink); border-radius:8px; padding:12px 14px; font-size:.9rem}
+.ok-box ul{margin:6px 0 0; padding-left:18px}
+
+/* directorio y locales plegables */
+.dir-wrap{border:1px solid var(--line); border-radius:var(--r); background:var(--surface); padding:0 14px}
+.dir-wrap > summary{cursor:pointer; padding:14px 0; font-family:var(--f-display); font-weight:600; font-size:1.02rem; min-height:44px; display:flex; align-items:center}
+.dir-wrap[open]{padding-bottom:14px}
+.dir-badge.down{background:var(--bad-soft); color:var(--bad)}
+.dir-pay{font-size:.75rem; color:var(--muted)}
+
+/* optimizador */
+.opt-opts{display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:14px}
+.strategies{display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:8px}
+.strat{border:1.5px solid var(--line); background:var(--surface); border-radius:var(--r); padding:12px; text-align:left; cursor:pointer; display:grid; gap:2px}
+.strat.on{border-color:var(--accent); background:var(--accent-soft)}
+.strat-total{font-family:var(--f-mono); font-size:1.15rem; font-weight:700}
+.strat small{color:var(--muted); font-size:.75rem}
+.totals{display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:8px; background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px}
+.totals div{display:grid}
+.totals span{font-size:.75rem; color:var(--muted)}
+.totals b{font-family:var(--f-mono); font-variant-numeric:tabular-nums}
+.totals .grand b{font-size:1.2rem; color:var(--accent)}
+.fix{display:flex; gap:6px; margin-top:6px; flex-wrap:wrap}
+.fix input{flex:1 1 220px; min-width:0}
+
+/* mi lista */
+.list-bar{display:flex; gap:8px; align-items:flex-end; flex-wrap:wrap}
+.list-bar .grow{flex:1 1 220px}
+.card.wish.done{opacity:.7}
+.from .down{color:var(--good)!important; font-weight:600}
+.from .up{color:var(--bad)!important; font-weight:600}
+.alert-box{border-top:1px dashed var(--line); padding-top:6px}
+.alert-box > summary{cursor:pointer; font-size:.85rem; font-weight:600; min-height:36px; display:flex; align-items:center}
+.hint{font-size:.78rem; color:var(--muted)}
+
+/* autocompletado con imagen */
+.ac-list li{display:flex; align-items:center; gap:8px; min-height:44px}
+.ac-list img, .ac-noimg{width:24px; height:34px; border-radius:3px; object-fit:cover; flex:none; background:var(--surface-2)}
+
+/* guía y páginas internas */
+.guide h1{font-size:1.5rem}
+.guide h2{font-size:1.15rem; margin-top:10px}
+.guide ul{display:grid; gap:6px; padding-left:20px}
+.guide code{font-family:var(--f-mono); background:var(--surface-2); padding:1px 5px; border-radius:4px}
+footer .linkbtn{font-size:inherit}
+.card.wish .ttl{flex-wrap:wrap}
+.card.wish .ttl > div:first-child{flex:1 1 160px; min-width:0}
+.card.wish .from{flex:0 1 auto}
+/* columnas fijas para que el encabezado de la comparación quede alineado */
+@media (min-width:861px){ .offer{grid-template-columns:minmax(0,1.2fr) minmax(0,2fr) 110px 130px 132px} }
+input[type=email], input[type=url], input[type=text], input:not([type]), input[inputmode=numeric]{
+  background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:var(--ink); font:inherit; width:100%; min-width:0}
+input[type=email]:focus, input[type=url]:focus, input[type=text]:focus, input:not([type]):focus{border-color:var(--accent)}
+.offer-head span:nth-child(4){text-align:right}

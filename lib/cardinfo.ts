@@ -226,6 +226,16 @@ export async function mtgEnglishName(q: string): Promise<string | null> {
   return result;
 }
 
+/** Magic: nombre correcto a partir de uno mal escrito ("lightnin bolt" → "Lightning Bolt") */
+export async function mtgFuzzyName(q: string): Promise<string | null> {
+  try {
+    const c = await getJSON<{ name: string }>(`https://api.scryfall.com/cards/named?fuzzy=${encodeURIComponent(q)}`, 5000);
+    return c.name ?? null;
+  } catch {
+    return null;
+  }
+}
+
 // ---------- Pokémon: https://api.pokemontcg.io/v2 ----------
 const P_TYPE: Record<string, string> = {
   Fire: "Fuego", Water: "Agua", Grass: "Planta", Lightning: "Rayo", Psychic: "Psíquico", Fighting: "Lucha",

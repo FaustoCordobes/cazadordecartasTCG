@@ -1,17 +1,40 @@
 # Cazacartas
 
-Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **One Piece** y la app la busca en las tiendas TCG de Argentina. Te dice en qué tienda está, a qué precio, si hay stock y dónde queda el local, con link directo a la publicación. Abajo muestra las tiendas físicas del juego que no venden online, para consultarles por Instagram.
+Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **One Piece** y la app la busca en tiendas TCG de Argentina: en qué tienda está, a qué precio, si hay stock, de cuándo es el dato y dónde queda el local, con link directo a la publicación.
 
-> **Gratis y sin comisiones.** Cazacartas no vende cartas, no cobra comisiones y ninguna tienda paga por aparecer: solo muestra dónde está cada carta y lleva al usuario a la tienda para que le compre directamente a ella. Su objetivo es generar más ventas para las tiendas de Argentina y que cada jugador complete su mazo más fácil. Solo lee información pública, respeta robots.txt, se identifica con su propio User-Agent y hace pausas entre consultas. Si una tienda prefiere no aparecer, se la saca a pedido (WhatsApp 2944 24-2906). Las donaciones son voluntarias y se usan solo para mantener el servidor; no cambian los resultados.
+> **Gratis y sin comisiones.** Cazacartas no vende cartas, no cobra comisiones y ninguna tienda paga por aparecer ni por salir primera. Solo muestra dónde está cada carta y lleva al usuario a la tienda para que le compre directamente. Lee solo información pública, respeta robots.txt (incluido el Crawl-delay), se identifica con su propio User-Agent y hace pausas entre consultas. Si una tienda prefiere no aparecer, se la saca a pedido (WhatsApp 2944 24-2906). Las donaciones (alias `faust08`) son voluntarias y se usan solo para mantener el servidor; no cambian los resultados.
 
 ## Qué hace
 
-- **Buscar una carta**, con nombre autocompletado mientras escribís (en inglés o español para Yu-Gi-Oh!).
-- **Listado de cartas / Decklist:** pegás una decklist en casi cualquier formato (`4 Angemon BT25-034`, `Exosister Karmael x2`, `3x`, `-3`, `(3)`...) y la app muestra qué tienda tiene más cartas del mazo, la compra más barata carta por carta y una tabla ordenable por precio, rareza o cantidad. Las líneas que no entiende las marca con el formato correcto.
-  - En Digimon y One Piece se respeta el código (Angemon BT25-034 ≠ BT23-027). En Yu-Gi-Oh!, Magic y Pokémon sirve cualquier impresión con el mismo nombre.
-  - Entiende el formato de Pokémon TCG Live ("3 Charizard ex OBF 125") y el de Magic Arena/Moxfield ("2 Sol Ring (CMM) 395").
-- **Directorio de tiendas** con filtro por juego. Las tiendas que no se pueden consultar solas (robots.txt, sistemas propios, marketplaces) están en `lib/linkstores.ts`: la app muestra un botón que abre su buscador con la carta ya escrita.
-- **Fichas oficiales:** YGOPRODeck, digimoncard.io, Scryfall (Magic, con traducción desde el español), pokemontcg.io y optcgapi.com (One Piece).
+**Buscar una carta**
+- Por nombre (parcial, con o sin acentos), en inglés o español (Yu-Gi-Oh! y Magic se traducen solos) o por **código**: `RA01-EN008`, `BT19-070`, `OP01-025`, `125/197`.
+- Autocompletado desde 2 letras, con imagen de la carta cuando la base oficial la tiene.
+- Resultados **progresivos**: aparecen a medida que responde cada tienda. Si una tienda falla, se marca "temporalmente no disponible" y el resto sigue.
+- Si no hay resultados: "¿quisiste decir?", búsqueda por código, links a tiendas con búsqueda manual y locales.
+- **Coincidencia exacta vs. parcial** marcada en cada resultado; orden por relevancia, precio, tiendas, precio más reciente, cercanía o nombre (siempre se dice el criterio).
+- **No mezcla versiones**: código + rareza + variante (Foil, Parallel, Alter…) + idioma distinto del inglés son tarjetas separadas. Si hay estados mezclados (NM/LP) se avisa.
+- Cada publicación muestra: tienda, precio ARS (y referencia en USD con fuente y fecha), stock honesto (*N disponibles*, *Últimas unidades*, *Stock sin confirmar*, *Agotado*), estado, idioma, "Precio verificado recién" o "Último precio detectado hace X", descuento en efectivo si la tienda lo publica, y botones **Ver publicación**, **+ Lista** y **Reportar**.
+- Badges **Mejor precio** y **Único en stock** (nunca pagos).
+- **Historial de precios** (7/30/90 días) desde que empezamos a medir.
+- Filtros por juego (solo se muestran los que tienen datos) + tienda, provincia, stock, precio y "solo coincidencia exacta". **Todo queda en el link** para compartir (`?juego=magic&carta=sol%20ring&f_ver=Foil&orden=pasc`).
+
+**Listado de cartas / Decklist (optimizador de compra)**
+- Pegás la lista o subís un archivo: texto libre (`4 Agumon BT1-009`, `Exosister Karmael x2`), Pokémon TCG Live, Magic Arena/Moxfield, `.ydk` y `ydke://` de Yu-Gi-Oh!.
+- Las líneas que no entiende se corrigen ahí mismo, sin volver a pegar todo.
+- **Tres estrategias**: *Menor costo total*, *Menos tiendas* y *Equilibrada* (menos tiendas pagando como mucho 10 % más), más *Personalizada* eligiendo la tienda de cada carta a mano.
+- **Envíos sin inventar**: solo se suman si cargás un envío estimado por tienda o elegís retiro en local ($0). El resto figura como "envío sin datos".
+- Respeta el stock, avisa las copias con stock sin confirmar y las que no tiene nadie. "Mejor resultado entre las tiendas consultadas", nunca "el mínimo del país".
+- Copiar / mandar el plan por WhatsApp, pasarlo a Mi lista y compartir el listado por link.
+
+**Mi lista** (sin cuenta, en el navegador)
+- Varias listas con nombre, copias y **conseguidas**, cuánto falta.
+- **Alertas** "avisame si baja de $X" y "si vuelve el stock": se revisan al tocar *Actualizar precios* (no hay avisos con la app cerrada).
+- Cambio de precio desde que la guardaste, optimizar la compra de lo que falta, exportar/importar `.json`, compartir por WhatsApp.
+
+**Directorio** (`/tiendas` y plegable en la home)
+- *Búsqueda integrada* vs. *Búsqueda manual* vs. *Integración no disponible*, contadores derivados de los datos, fecha de revisión, formulario para **sugerir, corregir o pedir la baja** de una tienda.
+
+**Otros**: modo oscuro, PWA instalable, páginas por juego (`/magic`, `/pokemon`…), por carta (`/carta/magic/Sol%20Ring`), guía para principiantes (`/guia`), panel `/estado` de cada tienda indexada, sitemap y robots, analítica sin cookies, formulario de contacto.
 
 ## Cómo correrlo
 
@@ -19,71 +42,72 @@ Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **O
 npm install
 npm run indexar    # lee el catálogo de las tiendas Tiendanube/PrestaShop (tarda unos minutos)
 npm run dev        # http://localhost:3000
-npm test           # pruebas
+npm test           # pruebas (node:test)
+npx tsc --noEmit   # chequeo de tipos (hace de "lint")
+npm run build
 ```
 
-## Cómo busca
+## Variables de entorno (`.env.example`)
 
-Hay dos formas de consultar una tienda, según lo que permite su web:
+| Variable | Para qué | Obligatoria |
+|---|---|---|
+| `SUPABASE_URL` | catálogo diario, historial, reportes, analítica | No (sin ella: archivo local y sin reportes/historial) |
+| `SUPABASE_SERVICE_KEY` | clave de servidor (`sb_secret_…`). **Nunca** en el navegador ni en GitHub | Igual que la anterior |
+| `DOLAR_TIPO` | referencia en USD: `bolsa` (MEP, por defecto), `blue` u `oficial` | No |
+| `NEXT_PUBLIC_SITE_URL` | dominio para sitemap y links (por defecto el de Vercel) | No |
+
+## Base de datos (Supabase)
+
+1. `supabase/schema.sql` (catálogo).
+2. `supabase/migrations/002_mejoras.sql`: **corrélo una vez** en Supabase → SQL Editor. Habilita los 5 juegos en el catálogo y crea `historial_precios`, `reportes`, `busquedas_dia` y `clicks_dia` (sin IP ni datos de las personas).
+3. Los reportes se leen en Supabase → Table Editor → `reportes`.
+
+## Cómo busca en cada tienda
 
 | Modo | Plataformas | Cómo funciona |
 |---|---|---|
-| **En vivo** | WooCommerce, Shopify, Casco TCG | Se consulta su buscador en cada búsqueda. Precio y stock al instante. |
-| **Catálogo diario** | Tiendanube, PrestaShop | Su robots.txt bloquea el buscador, pero permite las categorías. `npm run indexar` recorre las categorías de cada juego y guarda (respetando el Crawl-delay de cada tienda) las publicaciones; las búsquedas se hacen sobre eso. |
+| **En vivo** | WooCommerce, Shopify, Casco TCG | Su buscador público en cada búsqueda (filtrando por la categoría o el tipo de cada juego). |
+| **Catálogo diario** | Tiendanube, PrestaShop | Su robots.txt bloquea el buscador pero permite las categorías: `npm run indexar` las recorre una vez por día. Si una tienda pide más de 20 s entre consultas, no se indexa. |
+| **Búsqueda manual** | sistemas propios, BigCommerce, marketplaces | `lib/linkstores.ts`: la app solo muestra un botón a su web o a su buscador. |
 
-Siempre se respeta robots.txt: si una tienda bloquea lo necesario, se saltea y la app muestra el motivo en "Ver el estado de cada tienda".
+## Agregar una tienda
 
-### Tiendas que consulta (22)
+- Con búsqueda integrada: en `lib/stores.ts` (`platform: "auto"` si no sabés la plataforma; para WooCommerce podés poner `wooCategory` por juego, para Tiendanube las `categories`).
+- Con búsqueda manual: en `lib/linkstores.ts`, con `searchUrl` (`{q}` = la carta) o `gameUrls`.
+- Antes: revisá robots.txt y que opere en Argentina. Hay una prueba que impide que una tienda esté en las dos listas.
 
-**En vivo:** Rancho Store, Phoenix Reborn, Azeroth Comic Store, Lair, El Ático de Hisui, Haru TCG (solo online), Casco TCG.
+## Agregar un juego
 
-**Catálogo diario:** La Cueva Dragon, Polybius, El Abismo de Helm, Aquí hay Dragones, Confluencia TCG, Duelist City, Ludik, Invictvs, Space Gaming.
+1. `lib/games.ts`: nombre, emblema, ejemplos, orden de rarezas, ejemplo de decklist.
+2. `lib/types.ts`: sumar el id a `Game`.
+3. `lib/parse.ts`: cómo leer el título (código, rareza, versión).
+4. `lib/cardinfo.ts` y `lib/suggest.ts`: base oficial de cartas y autocompletado.
+5. `app/components/App.tsx`: filtros del juego (`CARD_FILTERS`) y `lib/seo.ts` (textos de su página).
+6. En Supabase, sumar el id al `check` de `catalogo.game`.
 
-**Se detecta la plataforma sola:** Hadouken, La Batikueva, Dima Game, Tolaria, Lordpipas, Creepshop. La primera vez la app mira su home, reconoce la plataforma y la consulta en vivo o la indexa según corresponda.
-
-**Tiendas con local sin web para buscar:** las otras ~45 del relevamiento (`lib/directory.ts`) aparecen debajo de los resultados, filtradas por juego y provincia.
-
-### Sumar una tienda
-
-Agregala en `lib/stores.ts`. Si no sabés la plataforma, poné `platform: "auto"`. Para Tiendanube/PrestaShop podés indicar las categorías del juego; si no, se buscan solas en la home.
-
-## Catálogo diario en producción (Supabase + GitHub Actions)
-
-En tu compu el catálogo se guarda en `.data/catalogo.json`. En Vercel eso no persiste, así que:
-
-1. En Supabase → SQL Editor, corré `supabase/schema.sql`.
-2. En Vercel → Environment Variables: `SUPABASE_URL` y `SUPABASE_SERVICE_KEY` (la service role key; solo la usa el servidor).
-3. En GitHub → Settings → Secrets → Actions: las mismas dos variables.
-4. `.github/workflows/indexar.yml` corre el indexador todos los días a las 06:17. También se puede correr a mano desde la pestaña Actions.
-
-El indexador espera 1,5 s entre páginas para no cargar a las tiendas.
-
-## Archivos
+## Archivos principales
 
 ```
-app/page.tsx              página (filtros por juego, resultados, tiendas para consultar)
-app/api/buscar/route.ts   GET /api/buscar?game=digi&q=omnimon
-lib/search.ts             junta en vivo + catálogo, agrupa por carta
-lib/stores.ts             tiendas con web
-lib/directory.ts          relevamiento de 63 tiendas con local
-lib/adapters/             woocommerce, shopify, casco (en vivo) y catalog (Tiendanube, PrestaShop, WooCommerce)
-lib/indexer.ts            recorre categorías y guarda el catálogo
-lib/catalog.ts            guardado en Supabase o en archivo local
-lib/detect.ts             reconoce la plataforma de una tienda
-lib/cardinfo.ts           ficha oficial (digimoncard.io, YGOPRODeck)
-lib/decklist.ts           lee decklists pegadas
-lib/deck.ts               cruza el mazo con las tiendas (por tienda, compra más barata)
-lib/suggest.ts            sugerencias de nombres (GET /api/sugerencias)
-app/components/           Autocomplete, Deck, Aviso
-scripts/indexar.ts        npm run indexar
+app/components/App.tsx        pantalla principal (búsqueda, filtros, resultados, comparación)
+app/components/Deck.tsx       listado de cartas + optimizador
+app/components/Wishlist.tsx   Mi lista (varias listas, alertas, exportar)
+app/components/searchClient.ts búsqueda progresiva + memoria de 10 min en el navegador
+app/api/buscar                búsqueda (JSON o NDJSON con ?stream=1)
+app/api/reporte|evento|historial|populares|dolar|ydk|estado
+lib/search.ts                 tiendas en vivo + catálogo, agrupado por versión
+lib/optimizer.ts              estrategias de compra
+lib/stats.ts                  historial y analítica (Supabase)
+lib/stores.ts / linkstores.ts tiendas integradas / con búsqueda manual
+supabase/                     esquema y migraciones
+docs/PENDIENTES.md            lo que falta, riesgos y propuestas
 ```
 
 ## Límites conocidos
 
-- La búsqueda de Shopify devuelve como máximo 10 productos por tienda.
-- En Tiendanube, un stock vacío significa "ilimitado": se muestra como "Disponible".
-- Phoenix Reborn usa una verificación de Cloudflare; si bloquea las consultas automáticas, aparece con error.
-- Antes de lanzar, conviene avisarle a cada tienda: les mandás clientes y es mejor que lo sepan.
+- Shopify devuelve como máximo 10 productos por tienda en cada búsqueda.
+- En Tiendanube, un stock vacío significa "ilimitado": se muestra "Disponible (sin cantidad)".
+- Phoenix Reborn usa una verificación de Cloudflare; si bloquea las consultas automáticas, aparece "temporalmente no disponible".
+- Mi lista vive en el navegador: no se sincroniza entre dispositivos (usá exportar/importar).
 
 ---
 
