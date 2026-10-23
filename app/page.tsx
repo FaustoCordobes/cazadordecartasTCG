@@ -1,26 +1,27 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { STORES } from "@/lib/stores.ts";
 import type { CardGroup, Game, SearchResponse } from "@/lib/types.ts";
 import { storesForGame } from "@/lib/directory.ts";
 import { Autocomplete } from "./components/Autocomplete.tsx";
 import { Deck } from "./components/Deck.tsx";
-import { AvisoCompleto, AvisoCorto, AvisoTiendas } from "./components/Aviso.tsx";
+import { AvisoCompleto, AvisoCorto, AvisoTiendas, Donar } from "./components/Aviso.tsx";
+import { ThemeToggle } from "./components/ThemeToggle.tsx";
+import { InstallApp } from "./components/InstallApp.tsx";
+import { ShareLinks } from "./components/ShareLinks.tsx";
+import { ProvinceSelect, useProvince } from "./components/useProvince.tsx";
+import { cardUrl, readParams } from "@/lib/share.ts";
+import { agoText, priceFreshness, type Freshness } from "@/lib/freshness.ts";
+import { sameArea } from "@/lib/provinces.ts";
 import { Wishlist } from "./components/Wishlist.tsx";
 import { useWishlist } from "./components/useWishlist.ts";
 import type { WishOffer } from "@/lib/wishlist.ts";
 
 type Tab = "carta" | "mazo" | "lista";
 
-/** "hace 3 h", "hace 2 días" */
-function ago(iso: string | null | undefined) {
-  if (!iso) return "sin fecha";
-  const h = Math.round((Date.now() - new Date(iso).getTime()) / 3600000);
-  if (h < 1) return "de hace minutos";
-  if (h < 48) return `de hace ${h} h`;
-  return `de hace ${Math.round(h / 24)} días`;
-}
+const STORE_PROVINCE = new Map(STORES.map((s) => [s.id, s.province]));
+const hhmm = (iso: string) => new Date(iso).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" });
 
 const domainOf = (u: string | null) => {
   if (!u) return null;
@@ -30,6 +31,8 @@ const domainOf = (u: string | null) => {
 type Flat = CardGroup["listings"][number] & {
   tipo?: string; sub?: string; extra?: string; attr?: string; race?: string; lvl?: string; color?: string[]; forma?: string;
   rar?: string; ver?: string; g: Game; cardName: string; cardKey: string;
+  /** tiene local en la provincia del usuario */
+  near: boolean; fresh: Freshness;
 };
 type FilterSpec = { k: keyof Flat; label: string; dep?: keyof Flat; resets?: (keyof Flat)[]; multi?: boolean };
 
@@ -101,23 +104,41 @@ export default function Home() {
   const [max, setMax] = useState("");
   const [sort, setSort] = useState("pasc");
   const [open, setOpen] = useState<Set<string>>(new Set());
+  const [province, setProvince] = useProvince();
+  const [onlyNear, setOnlyNear] = useState(false);
+  const [deckInit, setDeckInit] = useState<{ text: string; auto: boolean } | null>(null);
+  const [origin, setOrigin] = useState("");
+
+  // Links compartidos: /?juego=digimon&carta=kimeramon o /?juego=digimon&listado=...
+  useEffect(() => {
+    setOrigin(window.location.origin);
+    const p = readParams(window.location.search);
+    const g = p.game ?? "digi";
+    if (p.game) setGame(g);
+    if (p.deck) { setTab("mazo"); setDeckInit({ text: p.deck, auto: true }); }
+    else if (p.card) search(p.card, g);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const gameStores = STORES.filter((s) => s.games.includes(game));
 
   function switchGame(g: Game) {
     if (g === game) return;
-    setGame(g); setData(null); setError(null); setQ(""); setF({}); setMin(""); setMax(""); setOpen(new Set());
+    setGame(g); setData(null); setError(null); setQ(""); setF({}); setMin(""); setMax(""); setOpen(new Set()); setDeckInit(null);
+    window.history.replaceState(null, "", "/");
   }
 
-  async function search(text = q) {
+  async function search(text = q, g: Game = game) {
     const term = text.trim();
     if (term.length < 2) { setError("Escribí al menos 2 letras del nombre o el código de la carta."); return; }
     setQ(term); setLoading(true); setError(null); setF({}); setMin(""); setMax(""); setOpen(new Set());
     try {
-      const res = await fetch(`/api/buscar?game=${game}&q=${encodeURIComponent(term)}`);
+      const res = await fetch(`/api/buscar?game=${g}&q=${encodeURIComponent(term)}`);
       const json = await res.json();
       if (!res.ok) throw new Error(json.error ?? "Error en la búsqueda");
       setData(json as SearchResponse);
+      // La barra de direcciones queda con el link de esta búsqueda, listo para compartir
+      window.history.replaceState(null, "", cardUrl("", g, term));
     } catch (e) {
       setError((e as Error).message);
       setData(null);
@@ -129,6 +150,7 @@ export default function Home() {
   // Cada publicación con los datos de la carta "aplanados" para filtrar
   const flat: Flat[] = useMemo(() => {
     if (!data) return [];
+    const indexedAt = new Map(data.stores.map((s) => [s.id, s.indexedAt ?? null]));
     return data.cards.flatMap((c) =>
       c.listings.map((l) => ({
         ...l,
@@ -139,9 +161,11 @@ export default function Home() {
         g: game,
         cardName: c.name,
         cardKey: c.key,
+        near: l.hasLocal && sameArea(province, STORE_PROVINCE.get(l.storeId)),
+        fresh: priceFreshness(l.mode, indexedAt.get(l.storeId)),
       }) as Flat)
     );
-  }, [data, game]);
+  }, [data, game, province]);
 
   function options(spec: FilterSpec): string[] {
     let ls = flat;
@@ -159,6 +183,7 @@ export default function Home() {
       if (s.multi ? !((l[s.k] as string[] | undefined) ?? []).includes(v) : l[s.k] !== v) return false;
     }
     if (f.store && l.storeId !== f.store) return false;
+    if (onlyNear && province && !l.near) return false;
     if (f.stock === "si" && l.available !== true) return false;
     if (f.stock === "no" && l.available !== false) return false;
     if (min !== "" && l.price < +min) return false;
@@ -176,22 +201,25 @@ export default function Home() {
     }
     const meta = new Map((data?.cards ?? []).map((c) => [c.key, c]));
     const r = [...groups.entries()].map(([key, ls]) => {
+      if (sort === "near") ls = [...ls].sort((a, b) => Number(b.near) - Number(a.near));
       const avail = ls.filter((x) => x.available === true);
       const c = meta.get(key)!;
       return {
         key, name: c.name, code: c.code, rarity: c.rarity, version: c.version, setName: c.setName, ls,
-        min: (avail[0] ?? ls[0]).price, hasAvail: avail.length > 0, stores: new Set(ls.map((x) => x.storeId)).size,
+        min: Math.min(...(avail.length ? avail : ls).map((x) => x.price)), hasAvail: avail.length > 0, stores: new Set(ls.map((x) => x.storeId)).size,
+        near: ls.some((x) => x.near && x.available !== false),
       };
     });
     r.sort((a, b) =>
       sort === "pasc" ? Number(b.hasAvail) - Number(a.hasAvail) || a.min - b.min
       : sort === "pdesc" ? b.min - a.min
       : sort === "stores" ? b.stores - a.stores || a.min - b.min
+      : sort === "near" ? Number(b.near) - Number(a.near) || Number(b.hasAvail) - Number(a.hasAvail) || a.min - b.min
       : a.name.localeCompare(b.name) || (a.code ?? "").localeCompare(b.code ?? "", "en", { numeric: true })
     );
     return r;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [flat, f, min, max, sort, game]);
+  }, [flat, f, min, max, sort, game, onlyNear, province]);
 
   function setFilter(spec: FilterSpec | string, v: string) {
     const k = typeof spec === "string" ? spec : (spec.k as string);
@@ -203,12 +231,14 @@ export default function Home() {
   const active: [string, string][] = [];
   CARD_FILTERS[game].forEach((s) => f[s.k as string] && active.push([s.k as string, `${s.label}: ${label(s.k as string, f[s.k as string])}`]));
   if (f.store) active.push(["store", "Tienda: " + (STORES.find((s) => s.id === f.store)?.name ?? f.store)]);
+  if (onlyNear && province) active.push(["near", "Solo locales en " + province]);
   if (f.stock) active.push(["stock", f.stock === "si" ? "Con stock" : "Agotado"]);
   if (min) active.push(["min", "Desde " + fmt.format(+min)]);
   if (max) active.push(["max", "Hasta " + fmt.format(+max)]);
   function removeActive(k: string) {
     if (k === "min") return setMin("");
     if (k === "max") return setMax("");
+    if (k === "near") return setOnlyNear(false);
     const next = { ...f }; delete next[k];
     CARD_FILTERS[game].find((s) => s.k === k)?.resets?.forEach((r) => delete next[r as string]);
     setF(next);
@@ -244,7 +274,11 @@ export default function Home() {
               <p>Buscá una carta y compará precios en tiendas TCG de Argentina</p>
             </div>
           </div>
-          <span className="pill">Sin fines de lucro</span>
+          <div className="top-actions">
+            <span className="pill">Gratis · sin comisiones</span>
+            <InstallApp />
+            <ThemeToggle />
+          </div>
         </header>
         <AvisoCorto />
 
@@ -274,9 +308,9 @@ export default function Home() {
           </section>
         ) : tab === "mazo" ? (
           <section aria-labelledby="s2m" className="group">
-            <div className="step"><b>2</b><h2 id="s2m">Armá tu mazo</h2></div>
+            <div className="step"><b>2</b><h2 id="s2m">Listado de cartas / Decklist</h2></div>
             <ModeTabs tab={tab} setTab={setTab} count={wish.items.length} />
-            <Deck key={game} game={game} onAdded={(n) => { notify(`Se agregaron ${n} cartas a tu lista`); }} />
+            <Deck key={game + (deckInit?.text ?? "")} game={game} initialText={deckInit?.text} autoRun={deckInit?.auto} onAdded={(n) => { notify(`Se agregaron ${n} cartas a tu lista`); }} />
           </section>
         ) : (
         <>
@@ -323,7 +357,7 @@ export default function Home() {
                           <b>{s.name}</b>{" "}
                           <span>
                             {s.ok
-                              ? `${s.count} resultado${s.count === 1 ? "" : "s"} · ${s.mode === "index" ? `catálogo ${ago(s.indexedAt)}` : "en vivo"}`
+                              ? `${s.count} resultado${s.count === 1 ? "" : "s"} · ${s.mode === "index" ? `catálogo de ${agoText(s.indexedAt)}` : "en vivo"}`
                               : s.error}
                           </span>
                         </li>
@@ -368,6 +402,14 @@ export default function Home() {
                       </select>
                     </div>
                     <div className="field">
+                      <label htmlFor="f-prov-user">Tu provincia</label>
+                      <ProvinceSelect id="f-prov-user" value={province} onChange={(p) => { setProvince(p); if (!p) { setOnlyNear(false); if (sort === "near") setSort("pasc"); } }} />
+                      <label className="check">
+                        <input type="checkbox" checked={onlyNear && !!province} disabled={!province} onChange={(e) => setOnlyNear(e.target.checked)} />
+                        Solo tiendas con local en mi provincia
+                      </label>
+                    </div>
+                    <div className="field">
                       <label htmlFor="f-stock">Disponibilidad</label>
                       <select id="f-stock" value={f.stock ?? ""} onChange={(e) => setFilter("stock", e.target.value)}>
                         <option value="">Todas</option><option value="si">Con stock</option><option value="no">Agotado</option>
@@ -403,9 +445,16 @@ export default function Home() {
                   <option value="pasc">Menor precio</option>
                   <option value="pdesc">Mayor precio</option>
                   <option value="stores">Más tiendas</option>
+                  {province && <option value="near">Cerca mío primero</option>}
                   <option value="name">Nombre A–Z</option>
                 </select>
               </div>
+            </div>
+            <div className="res-tools">
+              <p className="fresh-note">
+                Precios consultados a las {hhmm(data.searchedAt)}. Algunas tiendas se leen una vez por día: cada precio indica de cuándo es.
+              </p>
+              {origin && <ShareLinks label="Compartir esta búsqueda" url={cardUrl(origin, game, data.q)} text={`Mirá dónde conseguir ${data.q} en tiendas de Argentina:`} />}
             </div>
             <div className="list">
               {rows.length === 0 && (
@@ -419,7 +468,7 @@ export default function Home() {
                 const [c1, c2, light] = thumbColors(first);
                 const isOpen = open.has(r.key);
                 const shown = isOpen ? r.ls : r.ls.slice(0, 5);
-                const bestIdx = r.ls.findIndex((x) => x.available === true);
+                const bestIdx = r.ls.reduce((bi, x, i) => (x.available === true && (bi < 0 || x.price < r.ls[bi].price) ? i : bi), -1);
                 const meta = first.g === "ygo"
                   ? [first.tipo && first.sub ? `${first.tipo} ${first.sub.toLowerCase()}${first.extra ? " · " + first.extra.toLowerCase() : ""}` : first.tipo, first.attr, first.lvl, first.race]
                   : [[...new Set(r.ls.flatMap((x) => x.color ?? []))].join(" / "), first.tipo, [[...new Set(r.ls.map((x) => x.lvl).filter(Boolean))].join(", "), first.forma].filter(Boolean).join(" · "), [...new Set(r.ls.map((x) => x.attr).filter(Boolean))].join(" / ")];
@@ -444,7 +493,7 @@ export default function Home() {
                         <div className="from">
                           <small>{r.hasAvail ? "Desde" : "Último precio"}</small>
                           <b>{fmt.format(r.min)}</b>
-                          <small>{r.ls.length} publicaciones en {r.stores} tienda{r.stores === 1 ? "" : "s"}</small>
+                          <small>{r.ls.length} publicaci{r.ls.length === 1 ? "ón" : "ones"} en {r.stores} tienda{r.stores === 1 ? "" : "s"}</small>
                         </div>
                       </div>
                       <div className="meta">
@@ -454,7 +503,12 @@ export default function Home() {
                       <div className="offers">
                         {shown.map((l, i) => (
                           <div key={l.url} className={`offer${i === bestIdx ? " best" : ""}${l.available === false ? " out" : ""}`}>
-                            <div className="o-store"><b>{l.storeName}</b><span>{l.hasLocal ? `Local en ${l.storeCity}` : "Solo online"}{l.mode === "index" ? " · precio del catálogo diario" : ""}</span></div>
+                            <div className="o-store">
+                              <b>{l.storeName}</b>
+                              <span>{l.hasLocal ? `Local en ${l.storeCity}` : "Solo online"}</span>
+                              {l.near && <span className="near near-line">📍 En tu provincia</span>}
+                              <small className={`fresh${l.fresh.stale ? " stale" : ""}`} title={l.fresh.stale ? "Puede haber cambiado: confirmalo en la tienda" : undefined}>{l.fresh.text}{l.fresh.stale ? " · puede haber cambiado" : ""}</small>
+                            </div>
                             <div className="o-print">
                               <span className="pc" title={l.title}>{l.title}</span>
                               <div className="o-tags">
@@ -516,11 +570,13 @@ export default function Home() {
 
         <PhysicalStores game={game} />
 
+        <Donar />
         <AvisoCompleto />
         {toast && <div className="toast" role="status">{toast} · <button type="button" className="linkbtn" onClick={() => setTab("lista")}>Ver mi lista</button></div>}
 
         <footer>
           <span>Propiedad de Cordobes Fausto</span>
+          <Donar compact />
           <a className="wa" href="https://wa.me/5492944242906" target="_blank" rel="noopener">Contacto por WhatsApp · 2944 24-2906</a>
         </footer>
       </div>
@@ -570,7 +626,7 @@ function ModeTabs({ tab, setTab, count }: { tab: Tab; setTab: (t: Tab) => void; 
   return (
     <div className="tabs mode-tabs" role="tablist" aria-label="Qué querés hacer">
       <button role="tab" aria-selected={tab === "carta"} className={tab === "carta" ? "on" : ""} onClick={() => setTab("carta")}>Buscar una carta</button>
-      <button role="tab" aria-selected={tab === "mazo"} className={tab === "mazo" ? "on" : ""} onClick={() => setTab("mazo")}>Armar un mazo</button>
+      <button role="tab" aria-selected={tab === "mazo"} className={tab === "mazo" ? "on" : ""} onClick={() => setTab("mazo")}>Listado de cartas / Decklist</button>
       <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "on" : ""} onClick={() => setTab("lista")}>Mi lista{count ? ` (${count})` : ""}</button>
     </div>
   );

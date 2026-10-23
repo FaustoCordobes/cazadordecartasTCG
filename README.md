@@ -2,12 +2,12 @@
 
 Escribís una carta de **Yu-Gi-Oh!** o **Digimon** y la app la busca en las tiendas TCG de Argentina. Te dice en qué tienda está, a qué precio, si hay stock y dónde queda el local, con link directo a la publicación. Abajo muestra las tiendas físicas del juego que no venden online, para consultarles por Instagram.
 
-> **Proyecto sin fines de lucro.** Cazacartas no vende cartas ni cobra comisiones: solo muestra dónde está cada carta y lleva al usuario a la tienda para que le compre directamente a ella. Su objetivo es generar más ventas para las tiendas de Argentina y que cada jugador complete su mazo más fácil. Solo lee información pública, respeta robots.txt, se identifica con su propio User-Agent y hace pausas entre consultas. Si una tienda prefiere no aparecer, se la saca a pedido (WhatsApp 2944 24-2906).
+> **Gratis y sin comisiones.** Cazacartas no vende cartas, no cobra comisiones y ninguna tienda paga por aparecer: solo muestra dónde está cada carta y lleva al usuario a la tienda para que le compre directamente a ella. Su objetivo es generar más ventas para las tiendas de Argentina y que cada jugador complete su mazo más fácil. Solo lee información pública, respeta robots.txt, se identifica con su propio User-Agent y hace pausas entre consultas. Si una tienda prefiere no aparecer, se la saca a pedido (WhatsApp 2944 24-2906). Las donaciones son voluntarias y se usan solo para mantener el servidor; no cambian los resultados.
 
 ## Qué hace
 
 - **Buscar una carta**, con nombre autocompletado mientras escribís (en inglés o español para Yu-Gi-Oh!).
-- **Armar un mazo:** pegás una decklist en casi cualquier formato (`4 Angemon BT25-034`, `Exosister Karmael x2`, `3x`, `-3`, `(3)`...) y la app muestra qué tienda tiene más cartas del mazo, la compra más barata carta por carta y una tabla ordenable por precio, rareza o cantidad. Las líneas que no entiende las marca con el formato correcto.
+- **Listado de cartas / Decklist:** pegás una decklist en casi cualquier formato (`4 Angemon BT25-034`, `Exosister Karmael x2`, `3x`, `-3`, `(3)`...) y la app muestra qué tienda tiene más cartas del mazo, la compra más barata carta por carta y una tabla ordenable por precio, rareza o cantidad. Las líneas que no entiende las marca con el formato correcto.
   - En Digimon se respeta el código (Angemon BT25-034 ≠ BT23-027). En Yu-Gi-Oh! sirve cualquier impresión con el mismo nombre.
 
 ## Cómo correrlo

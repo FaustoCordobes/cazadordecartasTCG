@@ -36,7 +36,7 @@ export function Wishlist({ onSearch }: { onSearch: () => void }) {
     return (
       <div className="panel empty">
         <h3>Tu lista está vacía</h3>
-        <p>Buscá una carta y tocá <b>Agregar a mi lista</b>, o armá un mazo y pasalo entero a tu lista. Se guarda en este navegador, no hace falta crear una cuenta.</p>
+        <p>Buscá una carta y tocá <b>Agregar a mi lista</b>, o pegá tu decklist en <b>Listado de cartas</b> y pasala entera a tu lista. Se guarda en este navegador, no hace falta crear una cuenta.</p>
         <button className="btn btn-primary" onClick={onSearch}>Buscar una carta</button>
       </div>
     );

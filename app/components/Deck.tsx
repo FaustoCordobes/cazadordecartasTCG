@@ -1,12 +1,21 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Game, SearchResponse } from "@/lib/types.ts";
 import { FORMAT_HINT, parseDecklist, type DeckError } from "@/lib/decklist.ts";
 import { cheapestPlan, coverageByStore, matchEntry, type DeckCard } from "@/lib/deck.ts";
 import { AvisoMazo } from "./Aviso.tsx";
 import { useWishlist } from "./useWishlist.ts";
 import type { WishOffer } from "@/lib/wishlist.ts";
+import type { DeckEntry } from "@/lib/decklist.ts";
+import { STORES } from "@/lib/stores.ts";
+import { deckUrl } from "@/lib/share.ts";
+import { agoText, hoursSince, STALE_HOURS } from "@/lib/freshness.ts";
+import { sameArea } from "@/lib/provinces.ts";
+import { ShareLinks } from "./ShareLinks.tsx";
+import { ProvinceSelect, useProvince } from "./useProvince.tsx";
+
+const STORE_PROVINCE = new Map(STORES.map((s) => [s.id, s.province]));
 
 const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 
@@ -35,9 +44,21 @@ const RAR_ORDER: Record<Game, string[]> = {
 type View = "tiendas" | "barata" | "cartas";
 type Sort = "precio-desc" | "precio-asc" | "rareza" | "nombre" | "cantidad" | "faltantes";
 
-export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => void }) {
+export function Deck({ game, onAdded, initialText, autoRun }: { game: Game; onAdded?: (n: number) => void; initialText?: string; autoRun?: boolean }) {
   const wish = useWishlist();
-  const [text, setText] = useState("");
+  const [text, setText] = useState(initialText ?? "");
+  const [entries, setEntries] = useState<DeckEntry[]>([]);
+  /** el catálogo diario más viejo entre las tiendas que respondieron */
+  const [catalogAt, setCatalogAt] = useState<string | null>(null);
+  const [province, setProvince] = useProvince();
+  const [onlyNear, setOnlyNear] = useState(false);
+  const started = useRef(false);
+
+  // Si se abrió desde un link compartido, se busca solo
+  useEffect(() => {
+    if (autoRun && initialText && !started.current) { started.current = true; run(); }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const [cards, setCards] = useState<DeckCard[] | null>(null);
   const [errors, setErrors] = useState<DeckError[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -49,6 +70,7 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
   async function run() {
     const parsed = parseDecklist(text, game);
     setErrors(parsed.errors);
+    setEntries(parsed.entries);
     setCards(null);
     if (!parsed.entries.length) return;
 
@@ -70,6 +92,9 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
       }
     }
     await Promise.all([worker(), worker(), worker()]);
+
+    const dates = [...results.values()].flatMap((r) => r?.stores.filter((s) => s.mode === "index" && s.ok && s.count > 0 && s.indexedAt).map((s) => s.indexedAt!) ?? []);
+    setCatalogAt(dates.length ? dates.sort()[0] : null);
 
     const matched = parsed.entries.map((e) => {
       const res = results.get(e.name);
@@ -101,7 +126,13 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
     onAdded?.(items.length);
   }
 
-  const stores = useMemo(() => (cards ? coverageByStore(cards.filter((c) => !c.error)) : []), [cards]);
+  const allStores = useMemo(() => (cards ? coverageByStore(cards.filter((c) => !c.error)) : []), [cards]);
+  const isNear = (storeId: string, hasLocal: boolean) => hasLocal && sameArea(province, STORE_PROVINCE.get(storeId));
+  const stores = useMemo(
+    () => (onlyNear && province ? allStores.filter((s) => isNear(s.storeId, s.hasLocal)) : allStores),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allStores, onlyNear, province]
+  );
   const plan = useMemo(() => (cards ? cheapestPlan(cards.filter((c) => !c.error)) : null), [cards]);
   const totalCopies = cards?.filter((c) => !c.error).reduce((s, c) => s + c.entry.qty, 0) ?? 0;
   const totalCards = cards?.filter((c) => !c.error).length ?? 0;
@@ -134,7 +165,7 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
         <div className="group-h"><h3 id="deck-t">Pegá tu lista de cartas</h3></div>
         <AvisoMazo />
         <div className="field">
-          <label htmlFor="deck">Decklist</label>
+          <label htmlFor="deck">Pegá tu listado de cartas / decklist</label>
           <textarea
             id="deck" rows={10} value={text} onChange={(e) => setText(e.target.value)}
             placeholder={EXAMPLES[game]} spellCheck={false}
@@ -143,7 +174,7 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
         </div>
         <div className="search">
           <button className="btn btn-primary" type="button" onClick={run} disabled={!!progress || !text.trim()}>
-            {progress ? `Buscando ${progress.done} de ${progress.total} cartas…` : "Buscar el mazo en las tiendas"}
+            {progress ? `Buscando ${progress.done} de ${progress.total} cartas…` : "Buscar el listado en las tiendas"}
           </button>
           <button className="btn btn-ghost" type="button" onClick={() => setText(EXAMPLES[game])}>Usar lista de ejemplo</button>
         </div>
@@ -173,6 +204,17 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
             <div className="stat"><b>{plan.missingCopies}</b><span>copias que ninguna tienda tiene</span></div>
           </div>
 
+          <div className="res-tools">
+            <p className="fresh-note">
+              {catalogAt
+                ? <>Algunas tiendas se leen una vez por día (la más vieja es {agoText(catalogAt)}{(hoursSince(catalogAt) ?? 0) > STALE_HOURS ? ", puede haber cambiado" : ""}). El resto son precios en vivo.</>
+                : "Todos los precios se consultaron en vivo recién."}
+            </p>
+            {typeof window !== "undefined" && entries.length > 0 && (
+              <ShareLinks label="Compartir este listado" url={deckUrl(window.location.origin, game, entries)} text={`Mirá dónde conseguir las cartas de este listado (${totalCopies} copias):`} />
+            )}
+          </div>
+
           <div className="tabs" role="tablist">
             {([["tiendas", "Por tienda"], ["barata", "Compra más barata"], ["cartas", "Por carta"]] as [View, string][]).map(([v, l]) => (
               <button key={v} role="tab" aria-selected={view === v} className={view === v ? "on" : ""} onClick={() => setView(v)}>{l}</button>
@@ -182,7 +224,15 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
           {view === "tiendas" && (
             <div className="list">
               <p className="translated">Ordenadas por cuántas copias de tu mazo tienen. Ideal para comprar todo en un solo lugar.</p>
-              {stores.length === 0 && <div className="empty"><p>Ninguna tienda tiene cartas de este mazo con stock.</p></div>}
+              <div className="near-bar">
+                <label className="lbl" htmlFor="deck-prov">Tu provincia</label>
+                <ProvinceSelect id="deck-prov" value={province} onChange={(p) => { setProvince(p); if (!p) setOnlyNear(false); }} />
+                <label className="check">
+                  <input type="checkbox" checked={onlyNear && !!province} disabled={!province} onChange={(e) => setOnlyNear(e.target.checked)} />
+                  Solo tiendas con local en mi provincia
+                </label>
+              </div>
+              {stores.length === 0 && <div className="empty"><p>{onlyNear && province ? `Ninguna tienda con local en ${province} tiene cartas de este listado. Destildá el filtro para ver las que envían.` : "Ninguna tienda tiene cartas de este mazo con stock."}</p></div>}
               {stores.map((s) => {
                 const pct = Math.round((s.copies / totalCopies) * 100);
                 const isOpen = openStore === s.storeId;
@@ -192,7 +242,7 @@ export function Deck({ game, onAdded }: { game: Game; onAdded?: (n: number) => v
                       <div className="ttl">
                         <div>
                           <h3>{s.storeName}</h3>
-                          <span className="alias">{s.hasLocal ? `Local en ${s.storeCity}` : "Solo online"}</span>
+                          <span className="alias">{s.hasLocal ? `Local en ${s.storeCity}` : "Solo online"}{isNear(s.storeId, s.hasLocal) && <span className="near"> · 📍 En tu provincia</span>}</span>
                         </div>
                         <div className="from">
                           <small>Tiene {s.cards} de {totalCards} cartas</small>

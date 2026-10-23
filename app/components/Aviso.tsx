@@ -4,12 +4,14 @@
  */
 
 const WA = "https://wa.me/5492944242906";
+/** Link de cobro de Mercado Pago del dueño del proyecto */
+export const DONAR_URL = "https://link.mercadopago.com.ar/faust08";
 
 export function AvisoCorto() {
   return (
     <p className="aviso-corto">
-      Cazacartas es un proyecto <b>sin fines de lucro</b>: no vende cartas ni cobra comisiones. Solo te muestra dónde está
-      cada carta y te lleva a la tienda para que le compres directamente a ella.
+      Cazacartas es <b>gratis y no cobra comisiones</b>: no vende cartas ni intermedia pagos. Solo te muestra dónde está cada
+      carta y te lleva a la tienda para que le compres directamente a ella.
     </p>
   );
 }
@@ -32,6 +34,30 @@ export function AvisoTiendas() {
   );
 }
 
+/** Botón de donación voluntaria */
+export function Donar({ compact = false }: { compact?: boolean }) {
+  if (compact) {
+    return <a className="donar-link" href={DONAR_URL} target="_blank" rel="noopener">💛 Donar para mantener el servidor</a>;
+  }
+  return (
+    <section className="donar" aria-labelledby="donar-t">
+      <div>
+        <h2 id="donar-t">¿Te sirvió Cazacartas?</h2>
+        <p>
+          Si te gustó la app y te ayudó a encontrar tus cartas, podés apoyar el proyecto con una donación. Es <b>totalmente
+          voluntaria</b> y se usa <b>únicamente para pagar el servidor</b> y que la app siga online y gratis para todos.
+        </p>
+        <p className="donar-nota">
+          Donar no da ningún beneficio: no cambia los resultados ni el orden de las tiendas, y ninguna tienda paga por aparecer.
+        </p>
+      </div>
+      <a className="donar-btn" href={DONAR_URL} target="_blank" rel="noopener">
+        <span aria-hidden="true">💛</span> Donar para mantener el servidor
+      </a>
+    </section>
+  );
+}
+
 export function AvisoCompleto() {
   return (
     <section className="aviso" aria-labelledby="aviso-t">
@@ -42,7 +68,8 @@ export function AvisoCompleto() {
         tienda ni competir con ellas.
       </p>
       <ul>
-        <li><b>Es sin fines de lucro.</b> No vendemos cartas, no cobramos comisiones ni intermediamos pagos.</li>
+        <li><b>Es gratis y no hace negocio con las tiendas.</b> No vendemos cartas, no cobramos comisiones, no intermediamos pagos y ninguna tienda paga por aparecer ni por salir primera.</li>
+        <li><b>Las donaciones son voluntarias</b> y se usan solo para mantener el servidor. No cambian nada de lo que muestra la app.</li>
         <li><b>La compra es siempre con la tienda.</b> Cada resultado te lleva a su página o a su local; los precios y el stock son los que ella publica.</li>
         <li><b>Cuidamos a las tiendas.</b> Solo leemos información pública, respetamos las reglas de cada sitio (robots.txt), nos identificamos y hacemos pausas entre consultas.</li>
         <li><b>Los datos pueden estar desactualizados.</b> Ante cualquier diferencia, vale lo que diga la tienda.</li>
