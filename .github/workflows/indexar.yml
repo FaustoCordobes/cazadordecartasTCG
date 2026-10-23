@@ -1,0 +1,24 @@
+   # Indexa una vez por día el catálogo de las tiendas que bloquean su buscador.
+   # Configurá en GitHub → Settings → Secrets: SUPABASE_URL y SUPABASE_SERVICE_KEY.
+   name: Indexar catálogo
+
+   on:
+     schedule:
+       - cron: "17 9 * * *"   # 06:17 en Argentina
+     workflow_dispatch: {}      # botón "Run workflow" para correrlo a mano
+
+   jobs:
+     indexar:
+       runs-on: ubuntu-latest
+       timeout-minutes: 120
+       steps:
+         - uses: actions/checkout@v4
+         - uses: actions/setup-node@v4
+           with:
+             node-version: 22
+             cache: npm
+         - run: npm ci
+         - run: npm run indexar
+           env:
+             SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+             SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
