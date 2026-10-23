@@ -25,16 +25,16 @@ export function cached(game: Game, q: string): SearchResponse | null {
 export async function search(
   game: Game,
   q: string,
-  opts: { signal?: AbortSignal; onProgress?: (p: Partial) => void; stream?: boolean } = {}
+  opts: { signal?: AbortSignal; onProgress?: (p: Partial) => void; stream?: boolean; fresh?: boolean } = {}
 ): Promise<SearchResponse> {
   const key = keyOf(game, q);
-  const hit = cached(game, q);
+  const hit = opts.fresh ? null : cached(game, q);
   if (hit) return hit;
   const running = inflight.get(key);
-  if (running && !opts.onProgress) return running;
+  if (running && !opts.onProgress && !opts.fresh) return running;
 
   const p = (async () => {
-    const url = `/api/buscar?game=${game}&q=${encodeURIComponent(q.trim())}${opts.stream === false ? "" : "&stream=1"}`;
+    const url = `/api/buscar?game=${game}&q=${encodeURIComponent(q.trim())}${opts.stream === false ? "" : "&stream=1"}${opts.fresh ? `&r=${Date.now()}` : ""}`;
     const res = await fetch(url, { signal: opts.signal });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));

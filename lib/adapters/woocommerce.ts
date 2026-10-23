@@ -72,7 +72,7 @@ export function mapWoo(products: WooProduct[], forcedGame: Game | null = null): 
 }
 
 export async function searchWoo(store: StoreConfig, q: string, game?: Game): Promise<RawListing[]> {
-  const data = await getJSON<WooProduct[]>(store.base + wooPath(q, store, game));
+  const data = await getJSON<WooProduct[]>(store.base + wooPath(q, store, game), 15000);
   if (!Array.isArray(data)) throw new Error("La API no devolvió productos");
   return mapWoo(data, game && store.wooCategory?.[game] ? game : null);
 }

@@ -50,3 +50,13 @@ test("Historial: un precio por versión y tienda (el más bajo con stock)", () =
   assert.deepEqual(rows.map((r) => [r.store_id, r.precio]), [["a", 700], ["b", 800]]);
   assert.equal(searchLabel(res), "Sol Ring");
 });
+
+test("Fallas pasajeras: se reintentan; las permanentes no", async () => {
+  const { isTransient } = await import("../lib/status.ts");
+  assert.ok(isTransient("La tienda tardó más de 8 s"));
+  assert.ok(isTransient("No se pudo conectar con la tienda"));
+  assert.ok(isTransient("Respondió 503"));
+  assert.ok(!isTransient("Respondió 403"));
+  assert.ok(!isTransient("Su robots.txt no permite esta búsqueda"));
+  assert.ok(!isTransient(undefined));
+});

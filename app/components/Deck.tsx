@@ -17,6 +17,7 @@ import { useWishlist } from "./useWishlist.ts";
 import { ShareLinks } from "./ShareLinks.tsx";
 import { ProvinceSelect, useProvince } from "./useProvince.tsx";
 import { search, searchMany, trackClick } from "./searchClient.ts";
+import { isTransient } from "@/lib/status.ts";
 import type { ReportContext } from "./ReportDialog.tsx";
 
 const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
@@ -45,6 +46,7 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
   const [cards, setCards] = useState<DeckCard[] | null>(null);
   const [errors, setErrors] = useState<DeckError[]>([]);
   const [failed, setFailed] = useState<string[]>([]);
+  const [pending, setPending] = useState<string[]>([]);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [view, setView] = useState<View>("plan");
@@ -112,12 +114,27 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
         results.set(name, null);
       }
       setProgress({ done: ++done, total: names.length });
-    });
+    }, 2);
+
+    // Reintento: las cartas en las que alguna tienda tardó o se cortó se vuelven a buscar de a una,
+    // con una pausa (el servidor solo vuelve a consultar las tiendas que fallaron)
+    const retry = names.filter((n) => { const r = results.get(n); return !r || r.stores.some((s) => isTransient(s.error)); });
+    if (retry.length) {
+      setNotice(`Algunas tiendas tardaron en responder: reintentando ${retry.length} carta${retry.length === 1 ? "" : "s"}…`);
+      for (const name of retry) {
+        await new Promise((r) => setTimeout(r, 1200));
+        try { results.set(name, await search(game, name, { stream: false, fresh: true })); } catch { /* queda el resultado anterior */ }
+      }
+      setNotice(null);
+    }
 
     const dates = [...results.values()].flatMap((r) => r?.stores.filter((s) => s.mode === "index" && s.ok && s.count > 0 && s.indexedAt).map((s) => s.indexedAt!) ?? []);
     setCatalogAt(dates.length ? dates.sort()[0] : null);
-    const down = new Set([...results.values()].flatMap((r) => r?.stores.filter((s) => !s.ok).map((s) => s.name) ?? []));
+    // "No respondieron" = fallas reales en vivo; las tiendas cuyo catálogo todavía no se cargó se informan aparte
+    const down = new Set([...results.values()].flatMap((r) => r?.stores.filter((s) => !s.ok && s.mode !== "index").map((s) => s.name) ?? []));
+    const noCatalog = new Set([...results.values()].flatMap((r) => r?.stores.filter((s) => !s.ok && s.mode === "index").map((s) => s.name) ?? []));
     setFailed([...down]);
+    setPending([...noCatalog]);
 
     setCards(parsed.entries.map((e) => {
       const res = results.get(e.name);
@@ -276,7 +293,8 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
               {catalogAt
                 ? <>Algunas tiendas se leen una vez por día (la más vieja es {agoText(catalogAt)}{(hoursSince(catalogAt) ?? 0) > STALE_HOURS ? ", puede haber cambiado" : ""}). El resto son precios en vivo.</>
                 : "Todos los precios se consultaron en vivo recién."}
-              {failed.length > 0 && <> No respondieron: {failed.join(", ")}.</>}
+              {failed.length > 0 && <> No respondieron en alguna carta (aun después de reintentar): {failed.join(", ")}.</>}
+              {pending.length > 0 && <> Sin catálogo cargado todavía: {pending.join(", ")}.</>}
             </p>
             {typeof window !== "undefined" && entries.length > 0 && (
               <ShareLinks label="Compartir este listado" url={deckUrl(window.location.origin, game, entries)} text={`Mirá dónde conseguir las cartas de este listado (${totalCopies} copias):`} />

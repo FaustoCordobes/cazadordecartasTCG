@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { searchAll } from "@/lib/search.ts";
+import { isTransient, searchAll } from "@/lib/search.ts";
 import { GAME_IDS, isGame } from "@/lib/games.ts";
 import { recordSearch } from "@/lib/stats.ts";
 
@@ -30,7 +30,8 @@ export async function GET(req: Request) {
     try {
       const data = await searchAll(game, q);
       await recordSearch(data).catch(() => {});
-      return NextResponse.json(data, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
+      const partial = data.stores.some((s) => isTransient(s.error));
+      return NextResponse.json(data, { headers: { "Cache-Control": partial ? "no-store" : "public, s-maxage=300, stale-while-revalidate=600" } });
     } catch {
       return NextResponse.json({ error: "No se pudo completar la búsqueda. Probá de nuevo en unos segundos." }, { status: 500 });
     }

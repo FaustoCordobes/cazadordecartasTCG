@@ -11,6 +11,11 @@ import { detectPlatform, modeFor } from "./detect.ts";
 import { catalog } from "./catalog.ts";
 
 const searchCache = new TTLCache<SearchResponse>(10 * 60 * 1000);
+/** Resultado de cada tienda en vivo (10 min): si después se reintenta, solo se vuelve a consultar la que falló */
+const storeCache = new TTLCache<RawListing[]>(10 * 60 * 1000, 3000);
+
+import { isTransient } from "./status.ts";
+export { isTransient };
 
 /** ¿Lo que escribió el usuario es un código de carta? (BT2-077, RA01-EN008) */
 export const looksLikeCode = (q: string) => /^[a-z0-9]{1,5}-[a-z0-9]{2,6}$/i.test(q.trim()) || /^[a-z]{0,4}\d{1,3}\/[a-z]{0,4}\d{1,3}$/i.test(q.trim());
@@ -224,7 +229,13 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
           statuses.push({ ...base, ms: Date.now() - t0, error: "Su robots.txt no permite esta búsqueda" });
           return;
         }
-        const raw = (await adapter.search(s, query, game)).filter((r) => relevant(r.name ?? r.title));
+        const ck = `${s.id}:${game}:${norm(query)}`;
+        let fetched = storeCache.get(ck);
+        if (!fetched) {
+          fetched = await adapter.search(s, query, game);
+          storeCache.set(ck, fetched);
+        }
+        const raw = fetched.filter((r) => relevant(r.name ?? r.title));
         const ls = toListings(game, s, platform as Listing["platform"], "live", raw, idxQuery);
         listings.push(...ls);
         statuses.push({ ...base, ok: true, count: ls.length, ms: Date.now() - t0 });
@@ -312,6 +323,7 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
       (looksLikeCode(q) && idx.byCode.has(q.trim().toUpperCase())) ||
       [...idx.byName.keys()].some((n) => queryWords(query).every((w) => n.includes(w))),
   };
-  if (statuses.some((s) => s.ok)) searchCache.set(key, res);
+  // Solo se guarda la respuesta entera si ninguna tienda falló por algo pasajero (así un reintento sirve)
+  if (statuses.some((s) => s.ok) && !statuses.some((s) => isTransient(s.error))) searchCache.set(key, res);
   return res;
 }

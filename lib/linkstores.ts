@@ -28,6 +28,12 @@ export interface LinkStore {
 
 export const LINK_STORES: LinkStore[] = [
   {
+    id: "phoenix", name: "Phoenix Reborn", url: "https://phoenixreborn.com.ar", games: ["ygo", "digi", "pkm", "op"],
+    kind: "tienda", city: "CABA (Villa Devoto)", province: "CABA", hasLocal: true, instagram: "phoenixrebornstore",
+    searchUrl: "https://phoenixreborn.com.ar/?s={q}&post_type=product",
+    note: "Su protección anti-bots (Cloudflare) bloquea las consultas automáticas: buscá en su web",
+  },
+  {
     id: "spacegaming", name: "Space Gaming", url: "https://spacegaminglomas.com", games: ["pkm", "op", "mtg", "ygo", "digi"],
     kind: "tienda", city: "Lomas de Zamora", province: "Buenos Aires", hasLocal: true, instagram: "spacegaminglomas",
     searchUrl: "https://spacegaminglomas.com/?s={q}&post_type=product",

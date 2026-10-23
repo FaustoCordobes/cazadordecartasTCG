@@ -69,6 +69,6 @@ export function shopifyMeta(type: string, tags: string[]) {
 }
 
 export async function searchShopify(store: StoreConfig, q: string): Promise<RawListing[]> {
-  const data = await getJSON<ShopifySuggest>(store.base + shopifyPath(q));
+  const data = await getJSON<ShopifySuggest>(store.base + shopifyPath(q), 15000);
   return mapShopify(store.base, data);
 }

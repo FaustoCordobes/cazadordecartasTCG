@@ -21,11 +21,7 @@ export const STORES: StoreConfig[] = [
     instagram: "ranchodelprofesor", cashDiscount: { percent: 10, label: "en efectivo" },
     wooCategory: { digi: "digimon", op: "one-piece", pkm: "pokemon", mtg: "magic" },
   },
-  {
-    id: "phoenix", name: "Phoenix Reborn", domain: "phoenixreborn.com.ar", base: "https://phoenixreborn.com.ar",
-    platform: "woocommerce", games: ["ygo", "digi", "pkm", "op"], city: "CABA (Villa Devoto)", province: "CABA", hasLocal: true,
-    instagram: "phoenixrebornstore",
-  },
+  // Phoenix Reborn pasó a "búsqueda manual" (lib/linkstores.ts): su Cloudflare responde 403 a los servidores.
   {
     id: "gravedad", name: "Gravedad", domain: "gravedad.com.ar", base: "https://gravedad.com.ar",
     platform: "woocommerce", games: ["mtg", "pkm", "op", "digi"], city: "José C. Paz", province: "Buenos Aires", hasLocal: true,
