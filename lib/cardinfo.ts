@@ -139,6 +139,214 @@ async function ygoLookup(name: string): Promise<InfoIndex> {
   return idx;
 }
 
+// ---------- Magic: https://api.scryfall.com ----------
+const M_COLOR: Record<string, string> = { W: "Blanco", U: "Azul", B: "Negro", R: "Rojo", G: "Verde" };
+const M_TYPES: [RegExp, string][] = [
+  [/\bcreature\b/i, "Criatura"], [/\bplaneswalker\b/i, "Planeswalker"], [/\binstant\b/i, "Instantáneo"], [/\bsorcery\b/i, "Conjuro"],
+  [/\benchantment\b/i, "Encantamiento"], [/\bartifact\b/i, "Artefacto"], [/\bland\b/i, "Tierra"], [/\bbattle\b/i, "Batalla"],
+];
+const M_RAR: Record<string, string> = { common: "Común", uncommon: "Infrecuente", rare: "Rara", mythic: "Mítica", special: "Especial", bonus: "Especial" };
+
+export interface ScryfallCard {
+  name: string;
+  set: string;
+  set_name: string;
+  collector_number: string;
+  rarity: string;
+  colors?: string[];
+  color_identity?: string[];
+  type_line?: string;
+  cmc?: number;
+  image_uris?: { small?: string };
+  card_faces?: { type_line?: string; colors?: string[]; image_uris?: { small?: string } }[];
+}
+
+export function mtgInfo(c: ScryfallCard): CardInfo {
+  const typeLine = c.type_line ?? c.card_faces?.[0]?.type_line ?? "";
+  const front = typeLine.split("//")[0];
+  const colors = (c.colors ?? c.card_faces?.[0]?.colors ?? []).map((x) => M_COLOR[x] ?? x);
+  return {
+    name: c.name,
+    tipo: M_TYPES.find(([re]) => re.test(front))?.[1] ?? "Otro",
+    sub: /\blegendary\b/i.test(front) ? "Legendaria" : undefined,
+    color: colors.length ? colors : ["Incoloro"],
+    lvl: typeof c.cmc === "number" && !/\bland\b/i.test(front) ? `Coste ${c.cmc}` : undefined,
+    rarity: M_RAR[c.rarity] ?? c.rarity,
+    setName: c.set_name,
+    image: c.image_uris?.small ?? c.card_faces?.[0]?.image_uris?.small,
+  };
+}
+
+async function mtgLookup(name: string): Promise<InfoIndex> {
+  const idx: InfoIndex = { byCode: new Map(), byName: new Map() };
+  let cards: ScryfallCard[] = [];
+  try {
+    // Nombre exacto primero; si no existe, búsqueda por palabras del nombre
+    let data = await getJSON<{ data: ScryfallCard[] }>(
+      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`!"${name}"`)}&unique=prints&order=released`
+    ).catch(() => null);
+    if (!data?.data?.length) {
+      data = await getJSON<{ data: ScryfallCard[] }>(
+        `https://api.scryfall.com/cards/search?q=${encodeURIComponent(name.split(/\s+/).map((w) => `name:${w}`).join(" "))}&unique=cards`
+      ).catch(() => null);
+    }
+    cards = data?.data ?? [];
+  } catch (e) {
+    if (!(e instanceof HttpError)) throw e;
+  }
+  for (const c of cards.slice(0, 120)) {
+    const info = mtgInfo(c);
+    idx.byCode.set(`${c.set.toUpperCase()}-${c.collector_number}`, info);
+    // por nombre se guarda la impresión sin rareza (cambia entre impresiones)
+    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined });
+    // las cartas de dos caras también se encuentran por cada cara
+    for (const face of c.name.split(" // ")) if (!idx.byName.has(norm(face))) idx.byName.set(norm(face), { ...info, name: c.name, rarity: undefined, setName: undefined });
+  }
+  return idx;
+}
+
+/** Magic: si el usuario escribe el nombre en español ("Rayo"), lo pasa al inglés */
+const mtgEnCache = new TTLCache<string | null>(24 * 60 * 60 * 1000);
+export async function mtgEnglishName(q: string): Promise<string | null> {
+  const key = norm(q);
+  const hit = mtgEnCache.get(key);
+  if (hit !== undefined) return hit;
+  let result: string | null = null;
+  try {
+    const data = await getJSON<{ data: { name: string; printed_name?: string }[] }>(
+      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`lang:es "${q}"`)}&include_multilingual=true&unique=cards`
+    );
+    const list = data.data ?? [];
+    const exact = list.find((c) => norm(c.printed_name) === key) ?? list.find((c) => norm(c.printed_name).startsWith(key));
+    result = exact?.name ?? null;
+  } catch {
+    result = null;
+  }
+  mtgEnCache.set(key, result);
+  return result;
+}
+
+// ---------- Pokémon: https://api.pokemontcg.io/v2 ----------
+const P_TYPE: Record<string, string> = {
+  Fire: "Fuego", Water: "Agua", Grass: "Planta", Lightning: "Rayo", Psychic: "Psíquico", Fighting: "Lucha",
+  Darkness: "Oscuridad", Metal: "Metal", Dragon: "Dragón", Fairy: "Hada", Colorless: "Incoloro",
+};
+const P_SUPER: Record<string, string> = { "Pokémon": "Pokémon", Trainer: "Entrenador", Energy: "Energía" };
+const P_SUB: Record<string, string> = {
+  Basic: "Básico", "Stage 1": "Fase 1", "Stage 2": "Fase 2", Supporter: "Partidario", Item: "Objeto", Stadium: "Estadio",
+  "Pokémon Tool": "Herramienta", Special: "Especial",
+};
+
+export interface PkmApiCard {
+  id: string;
+  name: string;
+  supertype: string;
+  subtypes?: string[];
+  types?: string[];
+  rarity?: string;
+  number: string;
+  set: { id: string; name: string; printedTotal: number; ptcgoCode?: string };
+  images?: { small?: string };
+}
+
+export function pkmInfo(c: PkmApiCard): CardInfo {
+  const subs = c.subtypes ?? [];
+  const stage = subs.find((x) => P_SUB[x]);
+  const mech = subs.filter((x) => !P_SUB[x] && !/^(Tera|Single Strike|Rapid Strike|Fusion Strike|Ancient|Future)$/.test(x));
+  return {
+    name: c.name,
+    tipo: P_SUPER[c.supertype] ?? c.supertype,
+    sub: stage ? P_SUB[stage] : undefined,
+    extra: mech.length ? mech.join(" ") : undefined,
+    color: c.types?.map((t) => P_TYPE[t] ?? t),
+    rarity: c.rarity,
+    setName: c.set.name,
+    image: c.images?.small,
+  };
+}
+
+async function pkmLookup(name: string): Promise<InfoIndex> {
+  const idx: InfoIndex = { byCode: new Map(), byName: new Map() };
+  const words = name.replace(/["*:]/g, " ").split(/\s+/).filter(Boolean);
+  if (!words.length) return idx;
+  let cards: PkmApiCard[] = [];
+  try {
+    const q = words.map((w) => `name:"${w}*"`).join(" ");
+    const data = await getJSON<{ data: PkmApiCard[] }>(
+      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=150&orderBy=-set.releaseDate&select=id,name,supertype,subtypes,types,rarity,number,set,images`,
+      12000
+    );
+    cards = data.data ?? [];
+  } catch (e) {
+    if (!(e instanceof HttpError)) return idx; // la base de Pokémon a veces tarda: se sigue sin ficha
+  }
+  for (const c of cards) {
+    const info = pkmInfo(c);
+    idx.byCode.set(`${c.number}/${c.set.printedTotal}`.toUpperCase(), info);
+    idx.byCode.set(c.number.toUpperCase().replace(/\s/g, ""), info); // promos: SWSH001, SVP050
+    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined });
+  }
+  return idx;
+}
+
+// ---------- One Piece: https://optcgapi.com ----------
+const O_COLOR: Record<string, string> = { Red: "Rojo", Green: "Verde", Blue: "Azul", Purple: "Morado", Black: "Negro", Yellow: "Amarillo" };
+const O_TYPE: Record<string, string> = { Leader: "Líder", Character: "Personaje", Event: "Evento", Stage: "Escenario", "DON!!": "DON!!" };
+const O_ATTR: Record<string, string> = { Slash: "Corte", Strike: "Golpe", Ranged: "A distancia", Special: "Especial", Wisdom: "Sabiduría" };
+
+export interface OpApiCard {
+  card_name: string;
+  set_name: string;
+  rarity: string;
+  card_set_id: string;
+  card_color?: string | null;
+  card_type?: string | null;
+  card_cost?: string | null;
+  sub_types?: string | null;
+  attribute?: string | null;
+  card_image?: string | null;
+}
+
+/** "Roronoa Zoro (025) (Parallel)" → "Roronoa Zoro" */
+export const opCleanName = (n: string) => n.replace(/\s*\((?:\d{3}|parallel|manga|alternate art|sp|[^)]*rare[^)]*)\)/gi, "").replace(/\s+/g, " ").trim();
+
+export function opInfo(c: OpApiCard): CardInfo {
+  return {
+    name: opCleanName(c.card_name),
+    tipo: c.card_type ? O_TYPE[c.card_type] ?? c.card_type : undefined,
+    color: c.card_color ? c.card_color.split(/[\s/]+/).filter(Boolean).map((x) => O_COLOR[x] ?? x) : undefined,
+    lvl: c.card_cost ? `Coste ${c.card_cost}` : undefined,
+    attr: c.attribute ? c.attribute.split(/[\s/]+/).map((x) => O_ATTR[x] ?? x).join(" / ") : undefined,
+    race: c.sub_types ?? undefined,
+    rarity: c.rarity === "L" ? "L" : c.rarity,
+    setName: c.set_name,
+    image: c.card_image ?? undefined,
+  };
+}
+
+async function opLookup(name: string): Promise<InfoIndex> {
+  const idx: InfoIndex = { byCode: new Map(), byName: new Map() };
+  const isCode = /^(?:OP|ST|EB|PRB)\d{2}-\d{3}$|^P-\d{3}$/i.test(name.trim());
+  const urls = isCode
+    ? [`https://optcgapi.com/api/sets/card/${name.trim().toUpperCase()}/`, `https://optcgapi.com/api/decks/card/${name.trim().toUpperCase()}/`]
+    : ["sets", "decks", "promos"].map((k) => `https://optcgapi.com/api/${k}/filtered/?card_name=${encodeURIComponent(name)}`);
+  const results = await Promise.allSettled(urls.map((u) => getJSON<OpApiCard[]>(u, 10000)));
+  for (const r of results) {
+    if (r.status !== "fulfilled" || !Array.isArray(r.value)) continue;
+    for (const c of r.value) {
+      const info = opInfo(c);
+      // la versión normal manda; la Parallel comparte código
+      if (!idx.byCode.has(c.card_set_id) || !/parallel/i.test(c.card_name)) idx.byCode.set(c.card_set_id.toUpperCase(), info);
+      if (!idx.byName.has(norm(info.name))) idx.byName.set(norm(info.name), { ...info, rarity: undefined, setName: undefined, image: undefined });
+    }
+  }
+  return idx;
+}
+
+const LOOKUP: Record<Game, (name: string) => Promise<InfoIndex>> = {
+  digi: digiLookup, ygo: ygoLookup, mtg: mtgLookup, pkm: pkmLookup, op: opLookup,
+};
+
 /** Busca la ficha oficial de varias cartas a la vez y arma un índice único */
 export async function lookupInfo(game: Game, names: string[]): Promise<InfoIndex> {
   const merged: InfoIndex = { byCode: new Map(), byName: new Map() };
@@ -147,7 +355,7 @@ export async function lookupInfo(game: Game, names: string[]): Promise<InfoIndex
       const key = `${game}:${norm(n)}`;
       let idx = infoCache.get(key);
       if (!idx) {
-        idx = game === "digi" ? await digiLookup(n) : await ygoLookup(n);
+        idx = await LOOKUP[game](n);
         infoCache.set(key, idx);
       }
       return idx;

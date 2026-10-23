@@ -5,24 +5,37 @@ import type { StoreConfig } from "./types.ts";
  *
  * - WooCommerce, Shopify y Casco TCG se consultan EN VIVO en cada búsqueda.
  * - Tiendanube y PrestaShop bloquean su buscador en robots.txt, así que se
- *   INDEXAN: `npm run indexar` recorre sus categorías de Yu-Gi-Oh!/Digimon una
+ *   INDEXAN: `npm run indexar` recorre sus categorías de cada juego una
  *   vez por día y guarda el catálogo (ver README).
  * - platform "auto": la plataforma se detecta sola la primera vez.
  *
  * Todas respetan robots.txt: si una tienda bloquea lo que hace falta, se saltea
- * y la app muestra el motivo.
+ * y la app muestra el motivo. Las tiendas que no se pueden consultar así están en
+ * lib/linkstores.ts (la app muestra un link a su buscador).
  */
 export const STORES: StoreConfig[] = [
   // ---------- En vivo ----------
   {
     id: "rancho", name: "Rancho Store", domain: "ranchostoretcg.com.ar", base: "https://ranchostoretcg.com.ar",
-    platform: "woocommerce", games: ["digi"], city: "CABA (Floresta)", province: "CABA", hasLocal: true,
+    platform: "woocommerce", games: ["digi", "op", "pkm", "mtg"], city: "CABA (Floresta)", province: "CABA", hasLocal: true,
     instagram: "ranchodelprofesor", cashDiscount: { percent: 10, label: "en efectivo" },
+    wooCategory: { digi: "digimon", op: "one-piece", pkm: "pokemon", mtg: "magic" },
   },
   {
     id: "phoenix", name: "Phoenix Reborn", domain: "phoenixreborn.com.ar", base: "https://phoenixreborn.com.ar",
-    platform: "woocommerce", games: ["ygo", "digi"], city: "CABA (Villa Devoto)", province: "CABA", hasLocal: true,
+    platform: "woocommerce", games: ["ygo", "digi", "pkm", "op"], city: "CABA (Villa Devoto)", province: "CABA", hasLocal: true,
     instagram: "phoenixrebornstore",
+  },
+  {
+    id: "gravedad", name: "Gravedad", domain: "gravedad.com.ar", base: "https://gravedad.com.ar",
+    platform: "woocommerce", games: ["mtg", "pkm", "op", "digi"], city: "José C. Paz", province: "Buenos Aires", hasLocal: true,
+    address: "Roque Sáenz Peña 5086", instagram: "gravedadstore",
+  },
+  {
+    id: "misato", name: "Misato Comics + Games", domain: "misatocomics.com.ar", base: "https://www.misatocomics.com.ar",
+    platform: "woocommerce", games: ["pkm", "mtg", "op"], city: "CABA (Monserrat y Flores)", province: "CABA", hasLocal: true,
+    address: "Salta 388, Monserrat · Av. Rivadavia 6743 local 63, Flores", instagram: "misatocomics",
+    wooCategory: { pkm: "cartas-singles", mtg: "magic-the-gathering", op: "one-piece-tcg" },
   },
   {
     id: "azeroth", name: "Azeroth Comic Store", domain: "azerothcomicstore.shop", base: "https://azerothcomicstore.shop",
@@ -31,7 +44,11 @@ export const STORES: StoreConfig[] = [
   },
   {
     id: "lair", name: "Lair (Magic Lair)", domain: "lair.com.ar", base: "https://www.lair.com.ar",
-    platform: "shopify", games: ["ygo"], city: "CABA (Caballito)", province: "CABA", hasLocal: true, instagram: "lair_argentina",
+    platform: "shopify", games: ["ygo", "mtg", "pkm", "op"], city: "CABA (Caballito)", province: "CABA", hasLocal: true, instagram: "lair_argentina",
+  },
+  {
+    id: "morgana", name: "Morgana Store", domain: "morganastore.com.ar", base: "https://morganastore.com.ar",
+    platform: "shopify", games: ["mtg", "pkm"], city: null, province: null, hasLocal: false, instagram: "morganastore.arg",
   },
   {
     id: "hisui", name: "El Ático de Hisui", domain: "aticodehisui.com", base: "https://aticodehisui.com",
@@ -40,15 +57,26 @@ export const STORES: StoreConfig[] = [
   },
   {
     id: "haru", name: "Haru TCG", domain: "harutcg.com", base: "https://harutcg.com",
-    platform: "shopify", games: ["ygo"], city: null, province: null, hasLocal: false,
+    platform: "shopify", games: ["ygo", "op"], city: null, province: null, hasLocal: false,
   },
   {
     id: "casco", name: "Casco TCG", domain: "cascotcg.com", base: "https://cascotcg.com",
-    platform: "casco", games: ["ygo", "digi"], gameIds: { ygo: 4, digi: 8 }, city: "Rosario", province: "Santa Fe",
+    platform: "casco", games: ["ygo", "digi", "mtg", "pkm", "op"], gameIds: { mtg: 1, ygo: 4, pkm: 5, digi: 8, op: 15 }, city: "Rosario", province: "Santa Fe",
     hasLocal: true, instagram: "cascotcg",
   },
 
   // ---------- Indexadas (Tiendanube) ----------
+  {
+    id: "magicgamestore", name: "Magic Game Store", domain: "magicgamestore.com.ar", base: "https://www.magicgamestore.com.ar",
+    platform: "tiendanube", games: ["mtg", "pkm", "op", "digi"], city: null, province: null, hasLocal: true,
+    address: "Olivera 719, e/ Medrano y Rondeau", instagram: "magic_game_store",
+    categories: {
+      mtg: ["/tcg/magic/singles/"],
+      pkm: ["/tcg/pokemon/pokemon-singles/"],
+      op: ["/tcg/one-piece-card-game/singles1/"],
+      digi: ["/tcg/digimon-card-game/singles2/"],
+    },
+  },
   {
     id: "cuevadragon", name: "La Cueva Dragon", domain: "lacuevadragon.com", base: "https://lacuevadragon.com",
     platform: "tiendanube", games: ["ygo", "digi"], city: "Córdoba", province: "Córdoba", hasLocal: true, instagram: "lacuevadragon",
@@ -91,6 +119,12 @@ export const STORES: StoreConfig[] = [
     platform: "tiendanube", games: ["ygo"], city: "Bahía Blanca", province: "Buenos Aires", hasLocal: true, instagram: "ludik.tcg",
   },
 
+  {
+    id: "s32", name: "S32 Supplies", domain: "s32supplies.com.ar", base: "https://www.s32supplies.com.ar",
+    platform: "tiendanube", games: ["mtg"], city: null, province: null, hasLocal: false, instagram: "s32supplies",
+    categories: { mtg: ["/trading-card-games/mtg-singles/"] },
+  },
+
   // ---------- Indexadas (PrestaShop) ----------
   {
     id: "invictvs", name: "Invictvs", domain: "invictvs.com.ar", base: "https://invictvs.com.ar",
@@ -99,13 +133,7 @@ export const STORES: StoreConfig[] = [
   },
 
   // ---------- Plataforma a detectar ----------
-  {
-    id: "spacegaming", name: "Space Gaming", domain: "spacegaminglomas.com", base: "https://spacegaminglomas.com",
-    platform: "woocommerce", mode: "index", games: ["ygo", "digi"], city: "Banfield", province: "Buenos Aires", hasLocal: true,
-    instagram: "spacegaminglomas",
-    // Su robots.txt bloquea la API y la búsqueda; el indexador recorre la categoría (permitida).
-    categories: { digi: ["/categoria-producto/digimon/"] },
-  },
+  // (Space Gaming pasó a "Buscá en su web": su robots.txt pide 60 s entre consultas y bloquea las URLs con "?")
   {
     id: "hadouken", name: "Hadouken", domain: "hadouken.com.ar", base: "https://hadouken.com.ar",
     platform: "auto", games: ["ygo", "digi"], city: "Córdoba", province: "Córdoba", hasLocal: true, instagram: "hadoukencba",

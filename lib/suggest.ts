@@ -2,10 +2,11 @@ import type { Game } from "./types.ts";
 import { getJSON, HttpError } from "./http.ts";
 import { TTLCache } from "./cache.ts";
 import { norm } from "./parse.ts";
+import { opCleanName } from "./cardinfo.ts";
 
 /**
  * Sugerencias de nombres mientras el usuario escribe.
- * Digimon: digimoncard.io · Yu-Gi-Oh!: YGOPRODeck (nombres en inglés y en español).
+ * Digimon: digimoncard.io · Yu-Gi-Oh!: YGOPRODeck · Magic: Scryfall · Pokémon: pokemontcg.io · One Piece: optcgapi.com
  */
 export interface Suggestion {
   name: string;
@@ -49,7 +50,31 @@ export async function suggest(game: Game, q: string): Promise<Suggestion[]> {
   if (hit) return hit;
 
   let out: Suggestion[] = [];
-  if (game === "digi") {
+  if (game === "mtg") {
+    const [auto, es] = await Promise.all([
+      safe(getJSON<{ data: string[] }>(`https://api.scryfall.com/cards/autocomplete?q=${encodeURIComponent(term)}`, 5000), { data: [] }),
+      safe(getJSON<{ data: { name: string; printed_name?: string }[] }>(
+        `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`lang:es "${term}"`)}&include_multilingual=true&unique=cards`, 5000), { data: [] }),
+    ]);
+    out = [
+      ...(auto.data ?? []).filter((n) => !n.includes(" // ") || !auto.data.includes(n.split(" // ")[0])).map((name) => ({ name })),
+      ...(es.data ?? []).filter((c) => c.printed_name).slice(0, 10).map((c) => ({ name: c.printed_name!, alt: c.name })),
+    ];
+  } else if (game === "pkm") {
+    const q = term.replace(/["*:]/g, " ").split(/\s+/).filter(Boolean).map((w) => `name:"${w}*"`).join(" ");
+    const data = await safe(
+      getJSON<{ data: { name: string }[] }>(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=60&select=name`, 6000),
+      { data: [] }
+    ).catch(() => ({ data: [] }));
+    out = (data.data ?? []).map((c) => ({ name: c.name }));
+  } else if (game === "op") {
+    const lists = await Promise.all(
+      ["sets", "decks"].map((k) =>
+        safe(getJSON<{ card_name: string }[]>(`https://optcgapi.com/api/${k}/filtered/?card_name=${encodeURIComponent(term)}`, 6000), []).catch(() => [])
+      )
+    );
+    out = lists.flat().filter((c) => c && typeof c.card_name === "string").map((c) => ({ name: opCleanName(c.card_name) }));
+  } else if (game === "digi") {
     const cards = await safe(
       getJSON<{ name: string }[] | { error: string }>(`https://digimoncard.io/api-public/search.php?n=${encodeURIComponent(term)}`, 5000),
       []

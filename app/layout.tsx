@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { THEME_SCRIPT } from "@/lib/theme.ts";
 
-const DESCRIPTION = "Buscá una carta de Yu-Gi-Oh! o Digimon y compará precio y stock en tiendas TCG de Argentina.";
+const DESCRIPTION = "Buscá una carta de Yu-Gi-Oh!, Digimon, Magic, Pokémon o One Piece y compará precio y stock en tiendas TCG de Argentina.";
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}` : "http://localhost:3000"),

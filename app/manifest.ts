@@ -4,7 +4,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "Cazacartas TCG",
     short_name: "Cazacartas",
-    description: "Buscá cartas de Yu-Gi-Oh! y Digimon y compará precio y stock en tiendas TCG de Argentina.",
+    description: "Buscá cartas de Yu-Gi-Oh!, Digimon, Magic, Pokémon y One Piece y compará precio y stock en tiendas TCG de Argentina.",
     lang: "es-AR",
     start_url: "/",
     scope: "/",

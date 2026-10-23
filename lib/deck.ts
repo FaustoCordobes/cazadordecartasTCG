@@ -1,6 +1,7 @@
 import type { DeckEntry } from "./decklist.ts";
 import type { Game, SearchResponse } from "./types.ts";
 import { norm } from "./parse.ts";
+import { GAMES } from "./games.ts";
 
 /** Una publicación que sirve para una carta del mazo */
 export interface DeckOffer {
@@ -42,12 +43,12 @@ export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): D
   const sameName = (n: string) => norm(n).replace(/[^a-z0-9]+/g, " ").trim() === want;
 
   const groups = res.cards.filter((g) => {
-    if (game === "digi" && entry.code) return g.code?.toUpperCase() === entry.code.toUpperCase();
+    if ((game === "digi" || game === "op") && entry.code) return g.code?.toUpperCase() === entry.code.toUpperCase();
     return sameName(g.name) || (g.info && sameName(g.info.name));
   });
   // Si no hubo coincidencia exacta de nombre (ej. el usuario escribió en español), se aceptan
   // las versiones de una sola carta encontrada.
-  const pool = groups.length || game === "digi" ? groups : new Set(res.cards.map((g) => norm(g.name))).size === 1 ? res.cards : [];
+  const pool = groups.length || ((game === "digi" || game === "op") && entry.code) ? groups : new Set(res.cards.map((g) => norm(g.name))).size === 1 ? res.cards : [];
 
   const offers: DeckOffer[] = [];
   let outOfStock = 0;
@@ -78,9 +79,7 @@ export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): D
   const name = pool[0]?.info?.name ?? pool[0]?.name ?? entry.name;
   let error: string | null = null;
   if (!res.known && !pool.length) {
-    error = `No reconocimos "${entry.raw.trim()}". Revisá cómo está escrito el nombre${game === "digi" ? " y el código" : ""}, por ejemplo: ${
-      game === "digi" ? "4 Angemon BT25-034" : "3 Ash Blossom & Joyous Spring"
-    }`;
+    error = `No reconocimos "${entry.raw.trim()}". Revisá cómo está escrito el nombre${game === "digi" || game === "op" ? " y el código" : ""}, por ejemplo: ${GAMES[game].deckHint}`;
   }
   return { entry, name, known: res.known || pool.length > 0, error, offers, outOfStock };
 }

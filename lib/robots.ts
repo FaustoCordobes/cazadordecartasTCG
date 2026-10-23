@@ -2,8 +2,34 @@ import { fetchWithTimeout } from "./http.ts";
 import { TTLCache } from "./cache.ts";
 
 type Rule = { allow: boolean; pattern: string };
+type Robots = { rules: Rule[]; crawlDelay: number | null };
 
-const robotsCache = new TTLCache<Rule[]>(6 * 60 * 60 * 1000);
+const robotsCache = new TTLCache<Robots>(6 * 60 * 60 * 1000);
+
+/** Crawl-delay (segundos) pedido a cualquier bot; null si no pide */
+export function parseCrawlDelay(txt: string): number | null {
+  let agents: string[] = [];
+  let inRules = false;
+  let delay: number | null = null;
+  for (const raw of txt.split(/\r?\n/)) {
+    const line = raw.replace(/#.*/, "").trim();
+    const i = line.indexOf(":");
+    if (i < 0) continue;
+    const key = line.slice(0, i).trim().toLowerCase();
+    const val = line.slice(i + 1).trim();
+    if (key === "user-agent") {
+      if (inRules) { agents = []; inRules = false; }
+      agents.push(val.toLowerCase());
+    } else {
+      inRules = true;
+      if (key === "crawl-delay" && (agents.includes("*") || agents.some((a) => a.startsWith("cazacartas")))) {
+        const n = Number(val);
+        if (Number.isFinite(n)) delay = Math.max(delay ?? 0, n);
+      }
+    }
+  }
+  return delay;
+}
 
 /** Lee las reglas de robots.txt que aplican a cualquier bot (User-agent: *) */
 export function parseRobots(txt: string): Rule[] {
@@ -51,16 +77,26 @@ export function isPathAllowed(rules: Rule[], path: string): boolean {
   return best ? best.allow : true;
 }
 
-export async function robotsAllows(base: string, pathWithQuery: string): Promise<boolean> {
-  let rules = robotsCache.get(base);
-  if (!rules) {
+async function loadRobots(base: string): Promise<Robots> {
+  let r = robotsCache.get(base);
+  if (!r) {
     try {
       const res = await fetchWithTimeout(`${base}/robots.txt`, 5000, "text/plain");
-      rules = res.ok ? parseRobots(await res.text()) : [];
+      const txt = res.ok ? await res.text() : "";
+      r = { rules: parseRobots(txt), crawlDelay: parseCrawlDelay(txt) };
     } catch {
-      rules = [];
+      r = { rules: [], crawlDelay: null };
     }
-    robotsCache.set(base, rules);
+    robotsCache.set(base, r);
   }
-  return isPathAllowed(rules, pathWithQuery);
+  return r;
+}
+
+export async function robotsAllows(base: string, pathWithQuery: string): Promise<boolean> {
+  return isPathAllowed((await loadRobots(base)).rules, pathWithQuery);
+}
+
+/** Segundos que la tienda pide esperar entre consultas (Crawl-delay), o null */
+export async function robotsCrawlDelay(base: string): Promise<number | null> {
+  return (await loadRobots(base)).crawlDelay;
 }

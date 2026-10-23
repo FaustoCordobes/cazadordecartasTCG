@@ -1,4 +1,5 @@
 import type { Game } from "./types.ts";
+import { GAMES } from "./games.ts";
 
 /**
  * "Mi lista": las cartas que el usuario quiere comprar, guardadas en su navegador
@@ -52,7 +53,7 @@ export const SHARE_WARNING =
 /** Texto para mandarse la lista por WhatsApp */
 export function buildShareText(list: WishItem[], now = new Date()): string {
   const fecha = now.toLocaleString("es-AR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" });
-  const games = [...new Set(list.map((i) => (i.game === "ygo" ? "Yu-Gi-Oh!" : "Digimon")))].join(" y ");
+  const games = [...new Set(list.map((i) => GAMES[i.game].short))].join(" y ");
   const lines: string[] = [`🃏 *Mi lista de cartas* (${games})`, `Armada el ${fecha} con Cazacartas`, ""];
   let total = 0;
   for (const it of list) {

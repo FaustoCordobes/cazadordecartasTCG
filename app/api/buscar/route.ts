@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { searchAll } from "@/lib/search.ts";
-import type { Game } from "@/lib/types.ts";
+import { GAME_IDS, isGame } from "@/lib/games.ts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -13,15 +13,15 @@ export async function GET(req: Request) {
   const game = searchParams.get("game");
   const q = (searchParams.get("q") ?? "").trim();
 
-  if (game !== "ygo" && game !== "digi") {
-    return NextResponse.json({ error: "Elegí un juego: ygo o digi." }, { status: 400 });
+  if (!isGame(game)) {
+    return NextResponse.json({ error: `Elegí un juego: ${GAME_IDS.join(", ")}.` }, { status: 400 });
   }
   if (q.length < 2 || q.length > 60) {
     return NextResponse.json({ error: "Escribí entre 2 y 60 caracteres." }, { status: 400 });
   }
 
   try {
-    const data = await searchAll(game as Game, q);
+    const data = await searchAll(game, q);
     return NextResponse.json(data, { headers: { "Cache-Control": "public, s-maxage=300, stale-while-revalidate=600" } });
   } catch (e) {
     return NextResponse.json({ error: "No se pudo completar la búsqueda. Probá de nuevo en unos segundos." }, { status: 500 });

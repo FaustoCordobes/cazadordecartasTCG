@@ -1,4 +1,5 @@
-export type Game = "ygo" | "digi";
+/** ygo = Yu-Gi-Oh!, digi = Digimon, mtg = Magic, pkm = Pokémon, op = One Piece */
+export type Game = "ygo" | "digi" | "mtg" | "pkm" | "op";
 
 /** Plataformas con adaptador. "auto" = se detecta sola la primera vez. */
 export type Platform = "woocommerce" | "shopify" | "tiendanube" | "prestashop" | "casco" | "auto";
@@ -29,6 +30,10 @@ export interface StoreConfig {
   wooApiPrefix?: string;
   /** Casco TCG: id interno de cada juego */
   gameIds?: Partial<Record<Game, number>>;
+  /** WooCommerce: categoría (slug) de cada juego, para que la búsqueda traiga solo ese juego */
+  wooCategory?: Partial<Record<Game, string>>;
+  /** Dirección del local, si la tienda la publica */
+  address?: string;
 }
 
 /** Lo que devuelve un adaptador, tal cual sale de la tienda */
@@ -47,6 +52,15 @@ export interface RawListing {
   name?: string;
   rarity?: string | null;
   setName?: string;
+  /** juego según la tienda (categoría, tipo de producto, atributo); null = no lo dice */
+  gameHint?: Game | null;
+  /** la tienda lo marca como carta suelta (true) o como otro producto (false); null = no lo dice */
+  isSingle?: boolean | null;
+  lang?: string | null;
+  /** Foil, Reverse Holo, Etched... */
+  finish?: string | null;
+  /** NM, LP, MP, HP, DMG */
+  condition?: string | null;
 }
 
 /** Ficha oficial de la carta (digimoncard.io / YGOPRODeck), ya traducida */
@@ -62,6 +76,11 @@ export interface CardInfo {
   forma?: string;
   /** Digimon: rareza oficial de esa impresión (C, U, R, SR, SEC...) */
   rarity?: string;
+  /** Pokémon/One Piece: expansión; Magic: tipo de línea completo */
+  setName?: string;
+  /** Magic/One Piece: coste; Pokémon: subtipos */
+  cost?: string;
+  image?: string;
 }
 
 export interface Listing extends RawListing {

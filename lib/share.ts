@@ -1,4 +1,5 @@
 import type { Game } from "./types.ts";
+import { GAME_IDS, GAMES, isGame } from "./games.ts";
 import type { DeckEntry } from "./decklist.ts";
 
 /**
@@ -13,13 +14,12 @@ export interface SharedParams {
   deck: string | null;
 }
 
-const GAME_PARAM: Record<Game, string> = { ygo: "yugioh", digi: "digimon" };
+const GAME_PARAM = Object.fromEntries(GAME_IDS.map((g) => [g, GAMES[g].param])) as Record<Game, string>;
 
 function gameFrom(v: string | null): Game | null {
-  const s = (v ?? "").toLowerCase();
-  if (["ygo", "yugioh", "yu-gi-oh"].includes(s)) return "ygo";
-  if (["digi", "digimon"].includes(s)) return "digi";
-  return null;
+  const s = (v ?? "").toLowerCase().replace(/[^a-z]/g, "");
+  if (isGame(s)) return s;
+  return GAME_IDS.find((g) => GAMES[g].param === s) ?? (s === "yugioh" ? "ygo" : null);
 }
 
 export function readParams(search: string): SharedParams {

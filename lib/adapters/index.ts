@@ -11,7 +11,7 @@ type LiveAdapter = {
 
 /** Plataformas que se consultan en vivo en cada búsqueda */
 export const LIVE_ADAPTERS: Partial<Record<string, LiveAdapter>> = {
-  woocommerce: { search: (s, q) => searchWoo(s, q), path: (q, s) => wooPath(q, s) },
+  woocommerce: { search: (s, q, g) => searchWoo(s, q, g), path: (q, s, g) => wooPath(q, s, g) },
   shopify: { search: (s, q) => searchShopify(s, q), path: (q) => shopifyPath(q) },
   casco: { search: searchCasco, path: cascoPath },
 };

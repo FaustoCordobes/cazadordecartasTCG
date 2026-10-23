@@ -714,4 +714,4 @@ export const DIRECTORY: PhysicalStore[] = [
  }
 ];
 
-export const storesForGame = (g: Game) => DIRECTORY.filter((s) => (g === "ygo" ? s.ygo : s.digi));
+export const storesForGame = (g: Game) => DIRECTORY.filter((s) => (g === "ygo" ? s.ygo : g === "digi" ? s.digi : false));

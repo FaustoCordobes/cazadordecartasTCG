@@ -2,7 +2,8 @@
 
 import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Game, SearchResponse } from "@/lib/types.ts";
-import { FORMAT_HINT, parseDecklist, type DeckError } from "@/lib/decklist.ts";
+import { formatHint, parseDecklist, type DeckError } from "@/lib/decklist.ts";
+import { GAME_IDS, GAMES } from "@/lib/games.ts";
 import { cheapestPlan, coverageByStore, matchEntry, type DeckCard } from "@/lib/deck.ts";
 import { AvisoMazo } from "./Aviso.tsx";
 import { useWishlist } from "./useWishlist.ts";
@@ -19,27 +20,8 @@ const STORE_PROVINCE = new Map(STORES.map((s) => [s.id, s.province]));
 
 const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 
-const EXAMPLES: Record<Game, string> = {
-  digi: `// DigimonCard.io Deck List
-4 Angemon BT25-034
-3 Angemon BT23-027
-1 Angewomon EX12-044
-4 Patamon BT25-031
-4 Tokomon BT14-003
-2 Yellow Scramble LM-029`,
-  ygo: `Ichiki Sayori-Hime x3
-Exosister Betrayal x3
-Exosister Karmael x2
-Sanaki the Mikanko Devotee x2
-Mikanko Shinbu - Noble Twins x3
-Uzuhime the Manifested Mikanko x2`,
-};
-
-const RAR_ORDER: Record<Game, string[]> = {
-  digi: ["C", "U", "R", "SR", "SEC", "UR", "P"],
-  ygo: ["Common", "Rare", "Super Rare", "Ultra Rare", "Secret Rare", "Ultimate Rare", "Ghost Rare", "Starlight Rare",
-    "Platinum Secret Rare", "Prismatic Secret Rare", "Prismatic Collector's Rare", "Quarter Century Secret Rare"],
-};
+const EXAMPLES = Object.fromEntries(GAME_IDS.map((g) => [g, GAMES[g].deckExample])) as Record<Game, string>;
+const RAR_ORDER = Object.fromEntries(GAME_IDS.map((g) => [g, GAMES[g].rarityOrder])) as Record<Game, string[]>;
 
 type View = "tiendas" | "barata" | "cartas";
 type Sort = "precio-desc" | "precio-asc" | "rareza" | "nombre" | "cantidad" | "faltantes";
@@ -170,12 +152,13 @@ export function Deck({ game, onAdded, initialText, autoRun }: { game: Game; onAd
             id="deck" rows={10} value={text} onChange={(e) => setText(e.target.value)}
             placeholder={EXAMPLES[game]} spellCheck={false}
           />
-          <span className="hint">{FORMAT_HINT}. La cantidad puede ir antes o después del nombre (3, x3, 3x, -3).</span>
+          <span className="hint">{formatHint(game)}. La cantidad puede ir antes o después del nombre (3, x3, 3x, -3).</span>
         </div>
         <div className="search">
           <button className="btn btn-primary" type="button" onClick={run} disabled={!!progress || !text.trim()}>
             {progress ? `Buscando ${progress.done} de ${progress.total} cartas…` : "Buscar el listado en las tiendas"}
           </button>
+          {progress && <span className="slow-note">Puede demorar unos segundos de más: buscamos cada carta en todas las tiendas.</span>}
           <button className="btn btn-ghost" type="button" onClick={() => setText(EXAMPLES[game])}>Usar lista de ejemplo</button>
         </div>
         {progress && (

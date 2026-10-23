@@ -1,4 +1,5 @@
 "use client";
+import { GAMES } from "@/lib/games.ts";
 
 import { useState } from "react";
 import { buildShareText, selectedOffer, SHARE_WARNING, whatsappLink } from "@/lib/wishlist.ts";
@@ -60,7 +61,7 @@ export function Wishlist({ onSearch }: { onSearch: () => void }) {
                   <div>
                     <h3>{it.name}</h3>
                     <div className="version">
-                      <span className="tag">{it.game === "ygo" ? "Yu-Gi-Oh!" : "Digimon"}</span>
+                      <span className="tag">{GAMES[it.game].short}</span>
                       {it.code && <span className="pc">{it.code}</span>}
                       {it.rarity && <span className="tag rar">{it.rarity}</span>}
                       {it.version && it.version !== "Normal" && <span className="tag ver">{it.version}</span>}

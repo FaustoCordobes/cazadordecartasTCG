@@ -1,6 +1,7 @@
 import type { CatalogItem, Game, RawListing, StoreConfig } from "./types.ts";
 import { getText, sleep } from "./http.ts";
-import { robotsAllows } from "./robots.ts";
+import { robotsAllows, robotsCrawlDelay } from "./robots.ts";
+import { GAMES } from "./games.ts";
 import { detectPlatform, modeFor } from "./detect.ts";
 import { discoverCategories, pageUrl, parsePrestashop, parseTiendanube, parseWooCategory } from "./adapters/catalog.ts";
 import { catalog } from "./catalog.ts";
@@ -18,7 +19,12 @@ export interface IndexOptions {
 
 /** Recorre las categorías de un juego en una tienda y devuelve todas sus publicaciones */
 export async function crawlStore(store: StoreConfig, game: Game, opts: IndexOptions = {}): Promise<RawListing[]> {
-  const { delayMs = 1500, maxPages = 400, log = () => {} } = opts;
+  const { maxPages = 400, log = () => {} } = opts;
+  let delayMs = opts.delayMs ?? 1500;
+  // Se respeta el Crawl-delay de la tienda; si pide demasiado, no se indexa
+  const crawlDelay = await robotsCrawlDelay(store.base);
+  if (crawlDelay && crawlDelay > 20) throw new Error(`Su robots.txt pide ${crawlDelay} s entre consultas: no se indexa para no cargarla`);
+  if (crawlDelay) delayMs = Math.max(delayMs, crawlDelay * 1000);
   const platform = await detectPlatform(store);
   if (!(platform in PARSERS)) throw new Error(`Plataforma ${platform}: no tiene lector de catálogo`);
   const parser = PARSERS[platform as IndexPlatform];
@@ -26,10 +32,10 @@ export async function crawlStore(store: StoreConfig, game: Game, opts: IndexOpti
   let cats = store.categories?.[game];
   if (!cats?.length) {
     if (!(await robotsAllows(store.base, "/"))) throw new Error("Su robots.txt no permite leer la home");
-    cats = discoverCategories(store.base, await getText(store.base + "/"))[game];
+    cats = discoverCategories(store.base, await getText(store.base + "/"))[game] ?? [];
     log(`  categorías encontradas: ${cats.join(", ") || "ninguna"}`);
   }
-  if (!cats.length) throw new Error("No se encontró una categoría de este juego en la home");
+  if (!cats?.length) throw new Error("No se encontró una categoría de este juego en la home");
 
   const seen = new Map<string, RawListing>();
   for (const cat of cats) {
@@ -46,7 +52,7 @@ export async function crawlStore(store: StoreConfig, game: Game, opts: IndexOpti
       }
       const items = parser(store.base, html);
       const before = seen.size;
-      for (const it of items) seen.set(it.url, it);
+      for (const it of items) seen.set(it.url, { ...it, gameHint: game });
       log(`  ${cat} página ${n}: ${items.length} productos`);
       // fin: página vacía, o una página que repite lo que ya teníamos
       if (!items.length || seen.size === before) break;
@@ -76,7 +82,7 @@ export async function indexAll(stores: StoreConfig[], opts: IndexOptions & { onl
       continue;
     }
     for (const game of store.games) {
-      log(`- ${store.name} · ${game === "ygo" ? "Yu-Gi-Oh!" : "Digimon"}`);
+      log(`- ${store.name} · ${GAMES[game].short}`);
       const indexedAt = new Date().toISOString();
       try {
         const raw = await crawlStore(store, game, opts);

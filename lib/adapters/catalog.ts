@@ -1,5 +1,6 @@
 import { parse, type HTMLElement } from "node-html-parser";
-import type { RawListing } from "../types.ts";
+import type { Game, RawListing } from "../types.ts";
+import { gameFromText } from "../games.ts";
 import { parseARS } from "../http.ts";
 import { decodeEntities } from "../parse.ts";
 
@@ -53,6 +54,29 @@ export function parseTiendanube(base: string, html: string): RawListing[] {
       available: anyAvail,
       stock: hasStockNumbers ? stock : null, // stock null en Tiendanube = ilimitado
       image: best.image_url ? abs(base, best.image_url.replace(/\\\//g, "/")) : undefined,
+    });
+  }
+  if (out.length) return out;
+
+  // Otras plantillas no traen data-variants: se lee el precio de data-product-price (en centavos)
+  for (const c of root.querySelectorAll(".js-item-product")) {
+    const nameEl = c.querySelector(".js-item-name, .item-name");
+    const a = c.querySelector("a.item-link, a[href*='/productos/']");
+    const title = decodeEntities((a?.getAttribute("title") || nameEl?.text || "").trim());
+    const url = abs(base, a?.getAttribute("href"));
+    const cents = Number(c.querySelector(".js-price-display")?.getAttribute("data-product-price") ?? 0);
+    if (!title || !url || !cents) continue;
+    const label = c.querySelector(".js-stock-label");
+    const soldOut = !!label && !/display:\s*none/i.test(label.getAttribute("style") ?? "");
+    const img = c.querySelector("img");
+    out.push({
+      title,
+      url,
+      price: cents / 100,
+      comparePrice: null,
+      available: soldOut ? false : true,
+      stock: null,
+      image: img ? abs(base, img.getAttribute("data-srcset")?.split(" ")[0] || img.getAttribute("src") || undefined) || undefined : undefined,
     });
   }
   return out;
@@ -125,10 +149,10 @@ export function pageUrl(platform: "tiendanube" | "prestashop" | "woocommerce", b
  * Busca en la home los links a las categorías de cada juego, para las tiendas
  * que no tienen categorías configuradas. Se queda con la más corta (la principal).
  */
-export function discoverCategories(base: string, html: string): { ygo: string[]; digi: string[] } {
+export function discoverCategories(base: string, html: string): Partial<Record<Game, string[]>> {
   const root = parse(html);
   const host = new URL(base).host.replace(/^www\./, "");
-  const found = { ygo: new Set<string>(), digi: new Set<string>() };
+  const found = new Map<Game, Set<string>>();
   for (const a of root.querySelectorAll("a[href]")) {
     const href = abs(base, a.getAttribute("href"));
     let u: URL;
@@ -139,13 +163,17 @@ export function discoverCategories(base: string, html: string): { ygo: string[];
     }
     if (u.host.replace(/^www\./, "") !== host) continue;
     if (/\/(productos?|products?)\//.test(u.pathname) || /\.html$/.test(u.pathname) || u.search) continue;
-    const p = u.pathname.toLowerCase();
-    if (/yu-?gi-?oh|\bygo\b/.test(p)) found.ygo.add(u.pathname);
-    if (/digimon/.test(p)) found.digi.add(u.pathname);
+    const g = gameFromText(u.pathname.replace(/[/_]/g, " "));
+    if (!g) continue;
+    if (!found.has(g)) found.set(g, new Set());
+    found.get(g)!.add(u.pathname);
   }
-  const top = (s: Set<string>) => {
-    const arr = [...s].sort((a, b) => a.length - b.length);
-    return arr.length ? [arr[0]] : [];
-  };
-  return { ygo: top(found.ygo), digi: top(found.digi) };
+  const out: Partial<Record<Game, string[]>> = {};
+  for (const [g, set] of found) {
+    // se prefiere la categoría de cartas sueltas; si no hay, la más corta (la principal)
+    const arr = [...set].sort((a, b) => a.length - b.length);
+    const singles = arr.find((p) => /single|suelta/i.test(p));
+    out[g] = [singles ?? arr[0]];
+  }
+  return out;
 }

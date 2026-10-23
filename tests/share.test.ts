@@ -18,7 +18,7 @@ test("Link de un listado ida y vuelta", () => {
 });
 
 test("Parámetros inválidos se ignoran", () => {
-  assert.deepEqual(readParams("?juego=magic&carta=%20"), { game: null, card: null, deck: null });
+  assert.deepEqual(readParams("?juego=ajedrez&carta=%20"), { game: null, card: null, deck: null });
 });
 
 test("Antigüedad del precio", () => {

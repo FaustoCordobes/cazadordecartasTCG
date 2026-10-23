@@ -1,6 +1,6 @@
 # Cazacartas
 
-Escribís una carta de **Yu-Gi-Oh!** o **Digimon** y la app la busca en las tiendas TCG de Argentina. Te dice en qué tienda está, a qué precio, si hay stock y dónde queda el local, con link directo a la publicación. Abajo muestra las tiendas físicas del juego que no venden online, para consultarles por Instagram.
+Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **One Piece** y la app la busca en las tiendas TCG de Argentina. Te dice en qué tienda está, a qué precio, si hay stock y dónde queda el local, con link directo a la publicación. Abajo muestra las tiendas físicas del juego que no venden online, para consultarles por Instagram.
 
 > **Gratis y sin comisiones.** Cazacartas no vende cartas, no cobra comisiones y ninguna tienda paga por aparecer: solo muestra dónde está cada carta y lleva al usuario a la tienda para que le compre directamente a ella. Su objetivo es generar más ventas para las tiendas de Argentina y que cada jugador complete su mazo más fácil. Solo lee información pública, respeta robots.txt, se identifica con su propio User-Agent y hace pausas entre consultas. Si una tienda prefiere no aparecer, se la saca a pedido (WhatsApp 2944 24-2906). Las donaciones son voluntarias y se usan solo para mantener el servidor; no cambian los resultados.
 
@@ -8,7 +8,10 @@ Escribís una carta de **Yu-Gi-Oh!** o **Digimon** y la app la busca en las tien
 
 - **Buscar una carta**, con nombre autocompletado mientras escribís (en inglés o español para Yu-Gi-Oh!).
 - **Listado de cartas / Decklist:** pegás una decklist en casi cualquier formato (`4 Angemon BT25-034`, `Exosister Karmael x2`, `3x`, `-3`, `(3)`...) y la app muestra qué tienda tiene más cartas del mazo, la compra más barata carta por carta y una tabla ordenable por precio, rareza o cantidad. Las líneas que no entiende las marca con el formato correcto.
-  - En Digimon se respeta el código (Angemon BT25-034 ≠ BT23-027). En Yu-Gi-Oh! sirve cualquier impresión con el mismo nombre.
+  - En Digimon y One Piece se respeta el código (Angemon BT25-034 ≠ BT23-027). En Yu-Gi-Oh!, Magic y Pokémon sirve cualquier impresión con el mismo nombre.
+  - Entiende el formato de Pokémon TCG Live ("3 Charizard ex OBF 125") y el de Magic Arena/Moxfield ("2 Sol Ring (CMM) 395").
+- **Directorio de tiendas** con filtro por juego. Las tiendas que no se pueden consultar solas (robots.txt, sistemas propios, marketplaces) están en `lib/linkstores.ts`: la app muestra un botón que abre su buscador con la carta ya escrita.
+- **Fichas oficiales:** YGOPRODeck, digimoncard.io, Scryfall (Magic, con traducción desde el español), pokemontcg.io y optcgapi.com (One Piece).
 
 ## Cómo correrlo
 
@@ -26,7 +29,7 @@ Hay dos formas de consultar una tienda, según lo que permite su web:
 | Modo | Plataformas | Cómo funciona |
 |---|---|---|
 | **En vivo** | WooCommerce, Shopify, Casco TCG | Se consulta su buscador en cada búsqueda. Precio y stock al instante. |
-| **Catálogo diario** | Tiendanube, PrestaShop | Su robots.txt bloquea el buscador, pero permite las categorías. `npm run indexar` recorre las categorías de Yu-Gi-Oh!/Digimon y guarda las publicaciones; las búsquedas se hacen sobre eso. |
+| **Catálogo diario** | Tiendanube, PrestaShop | Su robots.txt bloquea el buscador, pero permite las categorías. `npm run indexar` recorre las categorías de cada juego y guarda (respetando el Crawl-delay de cada tienda) las publicaciones; las búsquedas se hacen sobre eso. |
 
 Siempre se respeta robots.txt: si una tienda bloquea lo necesario, se saltea y la app muestra el motivo en "Ver el estado de cada tienda".
 
