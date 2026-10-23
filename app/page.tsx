@@ -6,7 +6,8 @@ import type { CardGroup, Game, SearchResponse } from "@/lib/types.ts";
 import { storesForGame } from "@/lib/directory.ts";
 import { Autocomplete } from "./components/Autocomplete.tsx";
 import { Deck } from "./components/Deck.tsx";
-import { AvisoCompleto, AvisoCorto, AvisoTiendas, Donar } from "./components/Aviso.tsx";
+import { AvisoCompleto, AvisoCorto, AvisoTiendas } from "./components/Aviso.tsx";
+import { Donar } from "./components/Donar.tsx";
 import { ThemeToggle } from "./components/ThemeToggle.tsx";
 import { InstallApp } from "./components/InstallApp.tsx";
 import { ShareLinks } from "./components/ShareLinks.tsx";
@@ -14,6 +15,9 @@ import { ProvinceSelect, useProvince } from "./components/useProvince.tsx";
 import { cardUrl, readParams } from "@/lib/share.ts";
 import { agoText, priceFreshness, type Freshness } from "@/lib/freshness.ts";
 import { sameArea } from "@/lib/provinces.ts";
+import { GAME_IDS, GAMES } from "@/lib/games.ts";
+import { LINK_STORES, linkFor } from "@/lib/linkstores.ts";
+import { StoreDirectory } from "./components/StoreDirectory.tsx";
 import { Wishlist } from "./components/Wishlist.tsx";
 import { useWishlist } from "./components/useWishlist.ts";
 import type { WishOffer } from "@/lib/wishlist.ts";
@@ -30,7 +34,7 @@ const domainOf = (u: string | null) => {
 
 type Flat = CardGroup["listings"][number] & {
   tipo?: string; sub?: string; extra?: string; attr?: string; race?: string; lvl?: string; color?: string[]; forma?: string;
-  rar?: string; ver?: string; g: Game; cardName: string; cardKey: string;
+  rar?: string; ver?: string; cond?: string; g: Game; cardName: string; cardKey: string;
   /** tiene local en la provincia del usuario */
   near: boolean; fresh: Freshness;
 };
@@ -58,23 +62,51 @@ const CARD_FILTERS: Record<Game, FilterSpec[]> = {
     { k: "set", label: "Expansión" },
     { k: "ver", label: "Versión" },
   ],
+  mtg: [
+    { k: "color", label: "Color", multi: true },
+    { k: "tipo", label: "Tipo de carta" },
+    { k: "lvl", label: "Coste de maná" },
+    { k: "rar", label: "Rareza" },
+    { k: "set", label: "Edición / set" },
+    { k: "ver", label: "Acabado (foil)" },
+    { k: "lang", label: "Idioma" },
+    { k: "cond", label: "Estado" },
+  ],
+  pkm: [
+    { k: "tipo", label: "Tipo de carta", resets: ["sub"] },
+    { k: "sub", label: "Fase / clase", dep: "tipo" },
+    { k: "extra", label: "Mecánica (ex, V, VMAX...)" },
+    { k: "color", label: "Tipo de energía", multi: true },
+    { k: "rar", label: "Rareza" },
+    { k: "set", label: "Expansión" },
+    { k: "ver", label: "Acabado (holo)" },
+    { k: "lang", label: "Idioma" },
+    { k: "cond", label: "Estado" },
+  ],
+  op: [
+    { k: "color", label: "Color", multi: true },
+    { k: "tipo", label: "Tipo de carta" },
+    { k: "lvl", label: "Coste" },
+    { k: "attr", label: "Atributo" },
+    { k: "rar", label: "Rareza" },
+    { k: "set", label: "Expansión" },
+    { k: "ver", label: "Versión (Parallel, Manga)" },
+    { k: "lang", label: "Idioma" },
+  ],
 };
-const DIGI_RAR: Record<string, string> = { C: "C · Común", U: "U · Poco común", R: "R · Rara", SR: "SR · Super rara", SEC: "SEC · Secreta", UR: "UR · Ultra rara", P: "P · Promo" };
-const RAR_ORDER: Record<Game, string[]> = {
-  digi: ["C", "U", "R", "SR", "SEC", "UR", "P"],
-  ygo: ["Common", "Rare", "Super Rare", "Ultra Rare", "Secret Rare", "Ultimate Rare", "Ghost Rare", "Starlight Rare", "Platinum Secret Rare", "Prismatic Secret Rare", "Prismatic Collector's Rare", "Quarter Century Secret Rare"],
-};
-const QUICK: Record<Game, string[]> = {
-  ygo: ["Ash Blossom", "Dark Magician", "Mago Oscuro", "Blue-Eyes White Dragon"],
-  digi: ["Omnimon", "Kimeramon", "Imperialdramon", "BT19-070"],
-};
+const RAR_ORDER = Object.fromEntries(GAME_IDS.map((g) => [g, GAMES[g].rarityOrder])) as Record<Game, string[]>;
 const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 
-const DIGI_COLORS: Record<string, string> = { Rojo: "#d8413a", Azul: "#2f7fd0", Amarillo: "#eac53a", Verde: "#3aa65a", Negro: "#3f3f48", Morado: "#8448c0", Blanco: "#e9e9ef" };
+const DIGI_COLORS: Record<string, string> = {
+  Rojo: "#d8413a", Azul: "#2f7fd0", Amarillo: "#eac53a", Verde: "#3aa65a", Negro: "#3f3f48", Morado: "#8448c0", Blanco: "#e9e9ef",
+  Incoloro: "#a7a7b2", Fuego: "#e0582f", Agua: "#3a8fd8", Planta: "#4caf50", Rayo: "#f2c230", "Psíquico": "#a35bc4",
+  Lucha: "#b5653a", Oscuridad: "#3d3b4f", Metal: "#8e98a3", "Dragón": "#b39338", Hada: "#e58fbf",
+};
+const LIGHT = new Set(["Blanco", "Amarillo", "Rayo", "Incoloro"]);
 function thumbColors(l: Flat): [string, string, boolean] {
-  if (l.g === "digi") {
-    const c = l.color ?? ["Blanco"];
-    return [DIGI_COLORS[c[0]] ?? "#777", DIGI_COLORS[c[1] ?? c[0]] ?? "#444", c.length === 1 && (c[0] === "Blanco" || c[0] === "Amarillo")];
+  if (l.g !== "ygo") {
+    const c = l.color?.length ? l.color : [l.g === "mtg" ? "Incoloro" : "Blanco"];
+    return [DIGI_COLORS[c[0]] ?? "#777", DIGI_COLORS[c[1] ?? c[0]] ?? "#444", c.length === 1 && LIGHT.has(c[0])];
   }
   if (l.tipo === "Mágica") return ["#1f9c86", "#0e5146", false];
   if (l.tipo === "Trampa") return ["#b53e86", "#5b1743", false];
@@ -157,6 +189,7 @@ export default function Home() {
         ...(l.info ?? {}),
         rar: l.rarity ?? undefined,
         ver: (game === "ygo" ? l.edition ?? l.version : l.version) ?? undefined,
+        cond: l.condition ?? undefined,
         set: l.set,
         g: game,
         cardName: c.name,
@@ -174,7 +207,7 @@ export default function Home() {
     if (spec.k === "rar") return vals.sort((a, b) => (RAR_ORDER[game].indexOf(a) + 1 || 99) - (RAR_ORDER[game].indexOf(b) + 1 || 99));
     return vals.sort((a, b) => a.localeCompare(b, "es", { numeric: true }));
   }
-  const label = (k: string, v: string) => (k === "rar" && game === "digi" ? DIGI_RAR[v] ?? v : v);
+  const label = (k: string, v: string) => (k === "rar" ? GAMES[game].rarityLabel?.[v] ?? v : v);
 
   function pass(l: Flat) {
     for (const s of CARD_FILTERS[game]) {
@@ -285,14 +318,15 @@ export default function Home() {
         <section aria-labelledby="s1">
           <div className="step"><b>1</b><h2 id="s1">Elegí el juego</h2></div>
           <div className="games">
-            {(["ygo", "digi"] as Game[]).map((g) => {
+            {GAME_IDS.map((g) => {
               const n = STORES.filter((s) => s.games.includes(g)).length;
+              const links = LINK_STORES.filter((s) => s.games.includes(g)).length;
               return (
                 <button key={g} className={`game g-${g}`} aria-pressed={game === g} onClick={() => switchGame(g)}>
-                  <div className="emb">{g === "ygo" ? <span>YG</span> : "DG"}</div>
+                  <div className="emb"><span>{GAMES[g].emblem}</span></div>
                   <div>
-                    <strong>{g === "ygo" ? "Yu-Gi-Oh!" : "Digimon Card Game"}</strong>
-                    <small>Busca en {n} tienda{n > 1 ? "s" : ""}</small>
+                    <strong>{GAMES[g].short}</strong>
+                    <small>{n} tienda{n > 1 ? "s" : ""}{links ? ` · ${links} con link` : ""}</small>
                   </div>
                 </button>
               );
@@ -323,19 +357,20 @@ export default function Home() {
                 <label htmlFor="q">Nombre o código</label>
                 <Autocomplete
                   id="q" game={game} value={q} onChange={setQ} onPick={(v) => search(v)}
-                  placeholder={game === "ygo" ? "Ash Blossom, Mago Oscuro, RA01-EN008" : "Omnimon, Kimeramon, BT19-070"}
+                  placeholder={GAMES[game].placeholder}
                 />
               </div>
               <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Buscando…" : "Buscar"}</button>
             </form>
             <div className="quick">
               <span>Probá:</span>
-              {QUICK[game].map((t) => <button key={t} type="button" onClick={() => search(t)}>{t}</button>)}
+              {GAMES[game].quick.map((t) => <button key={t} type="button" onClick={() => search(t)}>{t}</button>)}
             </div>
 
             {loading && (
               <div className="stores-bar" aria-live="polite">
                 <span className="sbadge wait"><i />Buscando en {gameStores.length} tiendas…</span>
+                <span className="slow-note">La búsqueda puede demorar unos segundos de más: consultamos cada tienda en el momento.</span>
               </div>
             )}
             {!loading && data && (() => {
@@ -374,7 +409,7 @@ export default function Home() {
             {flat.length > 0 && (
               <>
                 <div className="group">
-                  <div className="group-h"><h3>{game === "ygo" ? "Carta de Yu-Gi-Oh!" : "Carta de Digimon"}</h3></div>
+                  <div className="group-h"><h3>Carta de {GAMES[game].short}</h3></div>
                   <div className="grid">
                     {CARD_FILTERS[game].map((s) => {
                       const dis = !!s.dep && !f[s.dep as string];
@@ -454,6 +489,20 @@ export default function Home() {
               <p className="fresh-note">
                 Precios consultados a las {hhmm(data.searchedAt)}. Algunas tiendas se leen una vez por día: cada precio indica de cuándo es.
               </p>
+              {(() => {
+                const extra = LINK_STORES.filter((s) => s.games.includes(game));
+                if (!extra.length) return null;
+                return (
+                  <div className="also-in">
+                    <span className="lbl">Buscala también en</span>
+                    {extra.map((s) => (
+                      <a key={s.id} className="chip-link" href={linkFor(s, game, data.query)} target="_blank" rel="noopener" title={s.note}>
+                        {s.name} ↗
+                      </a>
+                    ))}
+                  </div>
+                );
+              })()}
               {origin && <ShareLinks label="Compartir esta búsqueda" url={cardUrl(origin, game, data.q)} text={`Mirá dónde conseguir ${data.q} en tiendas de Argentina:`} />}
             </div>
             <div className="list">
@@ -546,7 +595,7 @@ export default function Home() {
             {data.missing?.length > 0 && (
               <div className="group">
                 <div className="group-h"><h3>Otras versiones que ninguna tienda tiene publicadas ({data.missing.length})</h3></div>
-                <p className="translated">Existen según la base oficial de Digimon, pero ninguna de las tiendas consultadas las tiene a la venta ahora. Probá preguntar en las tiendas con local de abajo.</p>
+                <p className="translated">Existen según la base oficial de {GAMES[game].short}, pero ninguna de las tiendas consultadas las tiene a la venta ahora. Probá en las tiendas del directorio de abajo.</p>
                 <div className="missing">
                   {data.missing.map((m) => (
                     <div className="miss" key={m.code}>
@@ -568,7 +617,8 @@ export default function Home() {
         </>
         )}
 
-        <PhysicalStores game={game} />
+        <StoreDirectory game={game} q={data?.query ?? q} />
+        {storesForGame(game).length > 0 && <PhysicalStores game={game} />}
 
         <Donar />
         <AvisoCompleto />
@@ -605,7 +655,7 @@ function PhysicalStores({ game }: { game: Game }) {
           </select>
         </div>
       </div>
-      <p className="translated">Estas tiendas tienen {game === "ygo" ? "Yu-Gi-Oh!" : "Digimon"} pero no publican sus cartas en una web que se pueda buscar. Si no encontrás la carta arriba, preguntales por Instagram.</p>
+      <p className="translated">Estas tiendas tienen {GAMES[game].short} pero no publican sus cartas en una web que se pueda buscar. Si no encontrás la carta arriba, preguntales por Instagram.</p>
       <div className="phys">
         {shown.map((s) => (
           <div className="phys-item" key={s.name}>

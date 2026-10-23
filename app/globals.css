@@ -2,6 +2,7 @@
 :root{
   --bg:#f2f1f6; --surface:#ffffff; --surface-2:#f7f6fb; --ink:#191723; --muted:#646176; --line:#dcdae6;
   --ygo:#8a5f08; --ygo-soft:#f5ead0; --digi:#c44c0b; --digi-soft:#fde3d3;
+  --mtg:#1d6f63; --mtg-soft:#d9efea; --pkm:#2a5fb0; --pkm-soft:#dfe8f8; --op:#b0261f; --op-soft:#f9dedb;
   --good:#1d7449; --good-soft:#dbf0e3; --bad:#b0223a; --bad-soft:#f8dde2; --info:#2a5bb5; --info-soft:#dfe8f8;
   --on-accent:#ffffff;
   --accent:var(--ygo); --accent-soft:var(--ygo-soft);
@@ -13,17 +14,22 @@
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#13121a; --surface:#1c1a26; --surface-2:#242231; --ink:#ecebf4; --muted:#a09db2; --line:#322f42;
   --ygo:#e4b54b; --ygo-soft:#3a2f16; --digi:#ff8d4a; --digi-soft:#3e2416;
+  --mtg:#4fc3b1; --mtg-soft:#16312d; --pkm:#86aef5; --pkm-soft:#1d2a44; --op:#ff7b72; --op-soft:#3d1b1a;
   --good:#62d097; --good-soft:#163427; --bad:#ff7d90; --bad-soft:#3d1b24; --info:#86aef5; --info-soft:#1d2a44;
   --on-accent:#15131b; color-scheme:dark;
 }}
 :root[data-theme="dark"]{
   --bg:#13121a; --surface:#1c1a26; --surface-2:#242231; --ink:#ecebf4; --muted:#a09db2; --line:#322f42;
   --ygo:#e4b54b; --ygo-soft:#3a2f16; --digi:#ff8d4a; --digi-soft:#3e2416;
+  --mtg:#4fc3b1; --mtg-soft:#16312d; --pkm:#86aef5; --pkm-soft:#1d2a44; --op:#ff7b72; --op-soft:#3d1b1a;
   --good:#62d097; --good-soft:#163427; --bad:#ff7d90; --bad-soft:#3d1b24; --info:#86aef5; --info-soft:#1d2a44;
   --on-accent:#15131b; color-scheme:dark;
 }
 .app[data-game="digi"]{--accent:var(--digi); --accent-soft:var(--digi-soft)}
 .app[data-game="ygo"]{--accent:var(--ygo); --accent-soft:var(--ygo-soft)}
+.app[data-game="mtg"]{--accent:var(--mtg); --accent-soft:var(--mtg-soft)}
+.app[data-game="pkm"]{--accent:var(--pkm); --accent-soft:var(--pkm-soft)}
+.app[data-game="op"]{--accent:var(--op); --accent-soft:var(--op-soft)}
 
 *{box-sizing:border-box}
 body{background:var(--bg); color:var(--ink); font-family:var(--f-body); font-size:15px; line-height:1.45;}
@@ -45,12 +51,20 @@ a{color:var(--accent)}
 .step b{font-family:var(--f-mono); font-size:.75rem; color:var(--accent); border:1.5px solid var(--accent); border-radius:99px; padding:1px 8px}
 .step h2{font-size:1.05rem; font-weight:600}
 
-.games{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px}
+.games{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:10px}
 .game{border:1.5px solid var(--line); background:var(--surface); border-radius:var(--r); padding:16px; text-align:left; cursor:pointer; display:flex; gap:14px; align-items:center; transition:border-color .15s, background .15s}
 .game:hover{border-color:var(--muted)}
 .game[aria-pressed="true"]{border-color:var(--gc); background:var(--gs)}
 .game.g-ygo{--gc:var(--ygo); --gs:var(--ygo-soft)}
 .game.g-digi{--gc:var(--digi); --gs:var(--digi-soft)}
+.g-mtg{--gc:var(--mtg); --gs:var(--mtg-soft)}
+.g-pkm{--gc:var(--pkm); --gs:var(--pkm-soft)}
+.g-op{--gc:var(--op); --gs:var(--op-soft)}
+.g-ygo{--gc:var(--ygo); --gs:var(--ygo-soft)}
+.g-digi{--gc:var(--digi); --gs:var(--digi-soft)}
+.g-mtg .emb{font-size:.82rem}
+.g-pkm .emb{border-radius:50% 50% 50% 50% / 60% 60% 40% 40%}
+.g-op .emb{border-radius:10px}
 .emb{flex:none; width:46px; height:46px; border-radius:50%; display:grid; place-items:center; font-family:var(--f-display); font-weight:700; font-size:1.05rem; color:var(--on-accent); background:var(--gc)}
 .g-ygo .emb{border-radius:8px; transform:rotate(45deg)}
 .g-ygo .emb span{transform:rotate(-45deg)}
@@ -149,7 +163,10 @@ footer{border-top:1px solid var(--line); padding-top:18px; display:flex; justify
   .o-store{grid-area:store}.o-print{grid-area:print}.o-stock{grid-area:stock}.o-price{grid-area:price}.o-go{grid-area:go; justify-self:end}
 }
 @media (max-width:560px){
-  .games{grid-template-columns:1fr}
+  .games{grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px}
+  .game{padding:12px; gap:10px}
+  .game strong{font-size:1.02rem}
+  .emb{width:38px; height:38px; font-size:.9rem}
   .card{grid-template-columns:64px minmax(0,1fr); gap:12px; padding:12px}
   .thumb .tn{font-size:.48rem}
   .from{text-align:left}
@@ -287,3 +304,35 @@ html{background:var(--bg); transition:background-color .2s}
 .install-ios{position:relative; display:inline-flex}
 .install-help{position:absolute; right:0; top:calc(100% + 6px); z-index:30; width:min(260px, calc(100vw - 32px)); background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:.82rem; box-shadow:0 8px 24px rgba(0,0,0,.18)}
 .o-store .near-line{display:block; font-size:.78rem}
+
+
+/* v7: cinco juegos, directorio de tiendas y aviso de demora */
+.logo{background:linear-gradient(150deg,var(--ygo),var(--digi) 35%,var(--op) 55%,var(--pkm) 75%,var(--mtg))}
+.slow-note{font-size:.8rem; color:var(--muted); background:var(--surface-2); border:1px dashed var(--line); border-radius:99px; padding:4px 10px}
+.also-in{display:flex; align-items:center; gap:6px; flex-wrap:wrap; flex-basis:100%}
+.chip-link{font-size:.82rem; font-weight:600; text-decoration:none; border:1px solid var(--line); border-radius:99px; padding:4px 10px; background:var(--surface)}
+.chip-link:hover{border-color:var(--accent)}
+.dir-filters{display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-bottom:12px}
+.dir-chip{border:1px solid var(--line); background:var(--surface); border-radius:99px; padding:5px 12px; font-size:.85rem; font-weight:600; cursor:pointer}
+.dir-chip span{color:var(--muted); font-weight:500; margin-left:2px}
+.dir-chip.on{background:var(--gs, var(--accent-soft)); border-color:var(--gc, var(--accent)); color:var(--ink)}
+.dir-only{margin:0 0 0 6px}
+.dir-grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:10px}
+.dir-item{background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:12px 14px; display:flex; flex-direction:column; gap:6px; min-width:0}
+.dir-top{display:flex; justify-content:space-between; align-items:flex-start; gap:8px}
+.dir-top b{font-family:var(--f-display); font-size:1rem}
+.dir-badge{flex:none; font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; padding:3px 8px; border-radius:99px}
+.dir-badge.auto{background:var(--good-soft); color:var(--good)}
+.dir-badge.manual{background:var(--info-soft); color:var(--info)}
+.dir-place{font-size:.82rem; color:var(--muted)}
+.dir-games{display:flex; gap:4px; flex-wrap:wrap}
+.dir-game{font-size:.72rem; font-weight:600; padding:2px 8px; border-radius:99px; background:var(--gs); color:var(--gc)}
+.dir-note{font-size:.78rem; color:var(--muted); font-style:italic}
+.dir-actions{display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin-top:auto; padding-top:4px}
+.dir-ig{font-size:.8rem}
+@media (max-width:560px){ .dir-only{margin-left:0} }
+.donar-acciones{flex:none; display:flex; flex-direction:column; align-items:center; gap:6px}
+.donar-btn{border:0; cursor:pointer; font:inherit}
+.donar-hint{font-size:.8rem; color:var(--muted)}
+.alias-mp{font-family:var(--f-mono); background:var(--surface-2); border:1px solid var(--line); border-radius:6px; padding:1px 6px}
+@media (max-width:520px){.donar-acciones{width:100%}}
