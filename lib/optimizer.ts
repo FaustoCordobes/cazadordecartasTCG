@@ -23,12 +23,12 @@ export interface OptimizerOptions {
   overrides?: Record<string, string>;
 }
 
-export interface PlanBuy { storeId: string; storeName: string; qty: number; price: number; url: string; stockKnown: boolean; version: string | null }
+export interface PlanBuy { storeId: string; storeName: string; qty: number; price: number; url: string; stockKnown: boolean; version: string | null; codeUnverified?: boolean }
 export interface PlanLine { key: string; name: string; code: string | null; qty: number; buys: PlanBuy[]; missing: number }
 export interface PlanStore {
   storeId: string;
   storeName: string;
-  items: { name: string; code: string | null; qty: number; price: number; url: string; version: string | null }[];
+  items: { name: string; code: string | null; qty: number; price: number; url: string; version: string | null; codeUnverified?: boolean }[];
   subtotal: number;
   /** null = envío sin datos */
   shipping: number | null;
@@ -64,7 +64,7 @@ export function assign(cards: DeckCard[], allowed: Set<string> | null, opts: Opt
       if (!left) break;
       const take = Math.min(left, o.stock);
       if (take <= 0) continue;
-      buys.push({ storeId: o.storeId, storeName: o.storeName, qty: take, price: o.price, url: o.url, stockKnown: o.stockKnown, version: o.version && o.version !== "Normal" ? o.version : null });
+      buys.push({ storeId: o.storeId, storeName: o.storeName, qty: take, price: o.price, url: o.url, stockKnown: o.stockKnown, version: o.version && o.version !== "Normal" ? o.version : null, codeUnverified: o.codeUnverified });
       left -= take;
     }
     lines.push({ key, name: c.name, code: c.entry.code, qty: c.entry.qty, buys, missing: left });
@@ -86,7 +86,7 @@ function summarize(lines: PlanLine[], opts: OptimizerOptions, id: Plan["id"]): P
         storeId: b.storeId, storeName: b.storeName, items: [], subtotal: 0, pickup,
         shipping: pickup ? 0 : opts.shippingPerStore,
       };
-      s.items.push({ name: l.name, code: l.code, qty: b.qty, price: b.price, url: b.url, version: b.version });
+      s.items.push({ name: l.name, code: l.code, qty: b.qty, price: b.price, url: b.url, version: b.version, codeUnverified: b.codeUnverified });
       s.subtotal += b.qty * b.price;
       byStore.set(b.storeId, s);
     }

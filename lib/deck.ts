@@ -18,6 +18,8 @@ export interface DeckOffer {
   stock: number;
   stockKnown: boolean;
   url: string;
+  /** la tienda no publica el código: se tomó por nombre + expansión */
+  codeUnverified?: boolean;
 }
 
 export interface DeckCard {
@@ -39,11 +41,27 @@ export interface DeckCard {
  * - Yu-Gi-Oh!: sirve cualquier impresión con el mismo nombre.
  */
 export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): DeckCard {
-  const want = norm(entry.name).replace(/[^a-z0-9]+/g, " ").trim();
-  const sameName = (n: string) => norm(n).replace(/[^a-z0-9]+/g, " ").trim() === want;
+  const k = (n: string | null | undefined) => norm(n).replace(/[^a-z0-9]+/g, " ").trim();
+  const want = k(entry.name);
+  // Si la carta se escribió en español (o en inglés), vale también su nombre en el otro idioma
+  const wants = new Set([want]);
+  if (res.names && (k(res.names.en) === want || k(res.names.es) === want)) { wants.add(k(res.names.en)); wants.add(k(res.names.es)); }
+  const sameName = (n: string) => wants.has(k(n));
+  const byCode = (game === "digi" || game === "op") && !!entry.code;
+  const wantSet = byCode ? setKey(entry.code!.split("-")[0]) : null;
 
+  // Algunas tiendas (Casco) no publican el código de la carta, solo la expansión ("BT-20: ...").
+  // Ahí se acepta la carta si coincide el nombre y la expansión es la del código pedido.
+  const loose = new Set<string>();
   const groups = res.cards.filter((g) => {
-    if ((game === "digi" || game === "op") && entry.code) return g.code?.toUpperCase() === entry.code.toUpperCase();
+    if (byCode) {
+      if (g.code) return g.code.toUpperCase() === entry.code!.toUpperCase();
+      const nameOk = sameName(g.name) || (!!g.info && sameName(g.info.name));
+      const promo = /^P-?\d/i.test(entry.code!);
+      const setOk = !!g.setName && (promo ? /promo/i.test(g.setName) : !!wantSet && setKey(g.setName) === wantSet);
+      if (nameOk && setOk) loose.add(g.key);
+      return nameOk && setOk;
+    }
     return sameName(g.name) || (g.info && sameName(g.info.name));
   });
   // Si no hubo coincidencia exacta de nombre (ej. el usuario escribió en español), se aceptan
@@ -71,6 +89,7 @@ export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): D
         stock: typeof l.stock === "number" && l.stock > 0 ? l.stock : 99,
         stockKnown: typeof l.stock === "number" && l.stock > 0,
         url: l.url,
+        codeUnverified: loose.has(g.key) || (byCode && !l.code && !!g.code) || undefined,
       });
     }
   }
@@ -82,6 +101,12 @@ export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): D
     error = `No reconocimos "${entry.raw.trim()}". Revisá cómo está escrito el nombre${game === "digi" || game === "op" ? " y el código" : ""}, por ejemplo: ${GAMES[game].deckHint}`;
   }
   return { entry, name, known: res.known || pool.length > 0, error, offers, outOfStock };
+}
+
+/** "BT-20: Over the X" → "BT20", "BT20" → "BT20", "OP-01 Romance Dawn" → "OP01", "EX6" → "EX6" */
+export function setKey(s: string): string | null {
+  const m = s.toUpperCase().match(/\b(BT|EX|ST|LM|RB|AD|BO|OP|EB|PRB)\s*-?\s*0*(\d{1,2})\b/);
+  return m ? `${m[1]}${Number(m[2])}` : null;
 }
 
 export interface StoreCoverage {

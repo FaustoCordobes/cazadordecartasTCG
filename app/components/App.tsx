@@ -28,6 +28,7 @@ import { GAME_IDS, GAMES } from "@/lib/games.ts";
 import { LINK_STORES, linkFor } from "@/lib/linkstores.ts";
 import { BRAND, waLink } from "@/lib/brand.ts";
 import { norm } from "@/lib/parse.ts";
+import { median, refUsd } from "@/lib/refprice.ts";
 import type { WishOffer } from "@/lib/wishlist.ts";
 import type { Dolar } from "@/lib/dolar.ts";
 
@@ -313,7 +314,10 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
       const avail = ls.filter((x) => x.available === true);
       const c = meta.get(key)!;
       const conds = new Set(ls.map((x) => x.cond ?? "sin dato"));
+      const copies = avail.reduce((t, x) => t + (typeof x.stock === "number" ? x.stock : 0), 0);
       return {
+        altName: c.altName, ref: refUsd(game, c), median: avail.length >= 3 ? median(avail.map((x) => x.price)) : null,
+        copies, copiesKnown: avail.length > 0 && avail.every((x) => typeof x.stock === "number"),
         key, name: c.name, code: c.code, rarity: c.rarity, version: c.version, setName: c.setName, lang: c.lang ?? null, exact: !!c.exact, ls,
         min: Math.min(...(avail.length ? avail : ls).map((x) => x.price)), hasAvail: avail.length > 0, stores: new Set(ls.map((x) => x.storeId)).size,
         near: ls.some((x) => x.near && x.available !== false),
@@ -450,7 +454,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
             <div className="panel">
               <form className="search" role="search" onSubmit={(e) => { e.preventDefault(); search(); }}>
                 <div className="field">
-                  <label htmlFor="q">Nombre o código de la carta</label>
+                  <label htmlFor="q">Nombre o código de la carta{GAMES[game].bilingual && <small className="lbl-hint"> · en español o en inglés</small>}</label>
                   <Autocomplete id="q" game={game} value={q} onChange={setQ} onPick={(v) => search(v)} placeholder={GAMES[game].placeholder} />
                 </div>
                 <button className="btn btn-primary" type="submit" disabled={loading}>{loading ? "Buscando…" : "Buscar"}</button>
@@ -498,7 +502,11 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                   </div>
                 );
               })()}
-              {data && data.query !== data.q && <p className="translated">Se buscó como “{data.query}”, que es como publican las tiendas.</p>}
+              {data?.names ? (
+                <p className="translated bilingual">
+                  🌐 Se buscó con los dos nombres: <b>{data.names.en}</b> (inglés) y <b>{data.names.es}</b> (español), porque cada tienda publica con el de la impresión que tiene.
+                </p>
+              ) : data && data.query !== data.q ? <p className="translated">Se buscó como “{data.query}”, que es como publican las tiendas.</p> : null}
               {error && <div className="err-box" role="alert">{error} <button type="button" className="linkbtn" onClick={() => search()}>Reintentar</button></div>}
 
               {flat.length > 0 && (
@@ -591,14 +599,16 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                   {usd && <> Referencia en dólares: {usd.nombre} a {fmt.format(usd.venta)} ({new Date(usd.fecha).toLocaleDateString("es-AR")}, {usd.fuente}).</>}
                 </p>
                 {extraStores.length > 0 && (
-                  <div className="also-in">
-                    <span className="lbl">Buscala también en</span>
-                    {extraStores.map((s) => (
-                      <a key={s.id} className="chip-link" href={linkFor(s, game, data.query)} target="_blank" rel="noopener" title={s.searchUrl ? "Abre la búsqueda en su web (no es una publicación puntual)" : s.note}>
-                        {s.name} ↗
-                      </a>
-                    ))}
-                  </div>
+                  <details className="also-in-d">
+                    <summary>Buscala también en {extraStores.length} tienda{extraStores.length === 1 ? "" : "s"} con búsqueda manual</summary>
+                    <div className="also-in">
+                      {extraStores.map((s) => (
+                        <a key={s.id} className="chip-link" href={linkFor(s, game, data.query)} target="_blank" rel="noopener" title={s.searchUrl ? "Abre la búsqueda en su web (no es una publicación puntual)" : s.note}>
+                          {s.name} ↗
+                        </a>
+                      ))}
+                    </div>
+                  </details>
                 )}
                 {origin && <ShareLinks label="Compartir esta búsqueda" url={cardUrl(origin, game, data.q)} text={`Mirá dónde conseguir ${data.q} en tiendas de Argentina:`} />}
               </div>
@@ -651,6 +661,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                       <div className="ttl">
                         <div>
                           <h3>{r.name}</h3>
+                          {r.altName && <span className="alt-name" lang="es">En español: {r.altName}</span>}
                           <div className="version">
                             {r.code && <span className="pc">{r.code}</span>}
                             {r.rarity && <span className="tag rar">{label("rar", r.rarity)}</span>}
@@ -671,9 +682,21 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                         {meta.filter(Boolean).map((m) => <span className="tag" key={m}>{m}</span>)}
                         {r.onlyOne && <span className="tag only">Único en stock</span>}
                       </div>
+                      {(r.median || r.ref || r.copiesKnown) && (
+                        <dl className="pguide">
+                          {r.median && <div><dt>Mediana publicada</dt><dd>{fmt.format(r.median)}</dd></div>}
+                          {r.copiesKnown && <div><dt>Copias en stock</dt><dd>{r.copies}</dd></div>}
+                          {r.ref && (
+                            <div title="Precio de mercado en TCGplayer (Estados Unidos), sin envío ni impuestos de importación. Es solo una referencia para saber si un precio está muy alto o muy bajo.">
+                              <dt>Referencia TCGplayer (EE. UU.)</dt>
+                              <dd>{fmtUsd.format(r.ref)}{usd && <small> ≈ {fmt.format(Math.round(r.ref * usd.venta))}</small>}</dd>
+                            </div>
+                          )}
+                        </dl>
+                      )}
                       {r.condMix && <p className="warn-inline">⚠️ Hay publicaciones en distinto estado (NM, LP…). Fijate el estado de cada una antes de comparar precios.</p>}
                       <div className="card-actions">
-                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => addToList(r)}>⭐ Agregar a mi lista</button>
+                        <button type="button" className="btn btn-ghost btn-sm" onClick={() => addToList(r)}><span>⭐<span className="lg"> Agregar a mi</span> lista</span></button>
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => shareCard(r)}>Compartir</button>
                         <button type="button" className="btn btn-ghost btn-sm" aria-expanded={hist === r.key} onClick={() => setHist(hist === r.key ? null : r.key)}>📈 Historial</button>
                       </div>
@@ -700,6 +723,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                                   {l.g === "ygo" && l.edition && <span className="tag">{l.edition}</span>}
                                   {l.lang && <span className="tag">{l.lang}</span>}
                                   {l.condition && <span className="tag cond">{l.condition}</span>}
+                                  {r.code && !l.code && (game === "digi" || game === "op") && <span className="tag partial" title="La tienda no publica el código: la juntamos por nombre y expansión. Confirmalo en la publicación.">código sin confirmar</span>}
                                   {cash && <span className="tag cash">{cash.percent}% OFF {cash.label}</span>}
                                 </div>
                               </div>
@@ -822,9 +846,9 @@ function PhysicalStores({ game }: { game: Game }) {
 function ModeTabs({ tab, setTab, count }: { tab: Tab; setTab: (t: Tab) => void; count: number }) {
   return (
     <div className="tabs mode-tabs" role="tablist" aria-label="Qué querés hacer">
-      <button role="tab" aria-selected={tab === "carta"} className={tab === "carta" ? "on" : ""} onClick={() => setTab("carta")}>Buscar una carta</button>
-      <button role="tab" aria-selected={tab === "mazo"} className={tab === "mazo" ? "on" : ""} onClick={() => setTab("mazo")}>Listado de cartas / Decklist</button>
-      <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "on" : ""} onClick={() => setTab("lista")}>Mi lista{count ? ` (${count})` : ""}</button>
+      <button role="tab" aria-selected={tab === "carta"} className={tab === "carta" ? "on" : ""} onClick={() => setTab("carta")}>🔎 Buscar<span className="lg">&nbsp;una carta</span></button>
+      <button role="tab" aria-selected={tab === "mazo"} className={tab === "mazo" ? "on" : ""} onClick={() => setTab("mazo")}><span>📋<span className="lg"> Listado de cartas /</span> Decklist</span></button>
+      <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "on" : ""} onClick={() => setTab("lista")}>⭐ Mi lista{count ? ` (${count})` : ""}</button>
     </div>
   );
 }

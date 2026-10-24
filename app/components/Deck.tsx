@@ -378,7 +378,7 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
                       <ul className="deck-items">
                         {s.items.map((it) => (
                           <li key={it.name + it.code + it.url}>
-                            <span>{it.qty} × {it.name}{it.code ? ` (${it.code})` : ""}{it.version && <span className="tag ver">{it.version}</span>}</span>
+                            <span>{it.qty} × {it.name}{it.code ? ` (${it.code})` : ""}{it.version && <span className="tag ver">{it.version}</span>}{it.codeUnverified && <span className="tag partial" title="La tienda no publica el código: se eligió por nombre y expansión. Confirmalo en la publicación.">código sin confirmar</span>}</span>
                             <a href={it.url} target="_blank" rel="noopener" onClick={() => trackClick(game, s.storeId)}>{fmt.format(it.price)} c/u ↗</a>
                           </li>
                         ))}

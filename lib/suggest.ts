@@ -3,10 +3,12 @@ import { getJSON, HttpError } from "./http.ts";
 import { TTLCache } from "./cache.ts";
 import { norm } from "./parse.ts";
 import { digiImage, opCleanName } from "./cardinfo.ts";
+import { pkmSpanishSuggestions, ygoSpanishSuggestions } from "./names.ts";
 
 /**
  * Sugerencias de nombres mientras el usuario escribe.
- * Digimon: digimoncard.io · Yu-Gi-Oh!: YGOPRODeck · Magic: Scryfall · Pokémon: pokemontcg.io · One Piece: optcgapi.com
+ * Digimon: digimoncard.io · Yu-Gi-Oh!: YGOPRODeck + tabla de nombres en español · Magic: Scryfall (inglés y español)
+ * Pokémon: pokemontcg.io + TCGdex (español) · One Piece: optcgapi.com
  */
 export interface Suggestion {
   name: string;
@@ -64,11 +66,14 @@ export async function suggest(game: Game, q: string): Promise<Suggestion[]> {
     ];
   } else if (game === "pkm") {
     const q = term.replace(/["*:]/g, " ").split(/\s+/).filter(Boolean).map((w) => `name:"${w}*"`).join(" ");
-    const data = await safe(
-      getJSON<{ data: { name: string; images?: { small?: string } }[] }>(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=60&select=name,images`, 6000),
-      { data: [] }
-    ).catch(() => ({ data: [] }));
-    out = (data.data ?? []).map((c) => ({ name: c.name, image: (c as { images?: { small?: string } }).images?.small }));
+    const [data, es] = await Promise.all([
+      safe(
+        getJSON<{ data: { name: string; images?: { small?: string } }[] }>(`https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=60&select=name,images`, 6000),
+        { data: [] }
+      ).catch(() => ({ data: [] })),
+      pkmSpanishSuggestions(term).catch(() => []),
+    ]);
+    out = [...(data.data ?? []).map((c) => ({ name: c.name, image: (c as { images?: { small?: string } }).images?.small })), ...es];
   } else if (game === "op") {
     const lists = await Promise.all(
       ["sets", "decks"].map((k) =>
@@ -83,14 +88,12 @@ export async function suggest(game: Game, q: string): Promise<Suggestion[]> {
     );
     out = Array.isArray(cards) ? cards.map((c) => ({ name: c.name, image: c.id ? digiImage(c.id) : undefined })) : [];
   } else {
-    const [en, es] = await Promise.all([
-      safe(getJSON<{ data: { name: string; card_images?: { image_url_small?: string }[] }[] }>(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(term)}`, 5000), { data: [] }),
-      safe(getJSON<{ data: { name: string; name_en?: string }[] }>(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(term)}&language=es`, 5000), { data: [] }),
-    ]);
-    out = [
-      ...(en.data ?? []).map((c) => ({ name: c.name, image: c.card_images?.[0]?.image_url_small })),
-      ...(es.data ?? []).map((c) => ({ name: c.name, alt: c.name_en })),
-    ];
+    // Inglés: YGOPRODeck. Español: tabla local de nombres oficiales (YGOPRODeck no tiene español).
+    const en = await safe(
+      getJSON<{ data: { name: string; card_images?: { image_url_small?: string }[] }[] }>(`https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(term)}`, 5000),
+      { data: [] }
+    ).catch(() => ({ data: [] }));
+    out = [...(en.data ?? []).map((c) => ({ name: c.name, image: c.card_images?.[0]?.image_url_small })), ...ygoSpanishSuggestions(term)];
   }
   const ranked = rank(out, term);
   cache.set(key, ranked);

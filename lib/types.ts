@@ -81,6 +81,12 @@ export interface CardInfo {
   /** Magic/One Piece: coste; Pokémon: subtipos */
   cost?: string;
   image?: string;
+  /**
+   * Precio de referencia internacional de esa impresión, en dólares (TCGplayer, EE. UU.).
+   * Claves según el juego: normal/foil (Magic), normal/holofoil/reverseHolofoil (Pokémon),
+   * rareza normalizada (Yu-Gi-Oh!), normal/parallel (One Piece).
+   */
+  ref?: { src: string; prices: Record<string, number> };
 }
 
 export interface Listing extends RawListing {
@@ -116,6 +122,8 @@ export interface CardGroup {
   lang?: string | null;
   /** el nombre o el código coincide exacto con lo buscado */
   exact?: boolean;
+  /** nombre de la carta en español, cuando es distinto del nombre en inglés */
+  altName?: string;
   info: CardInfo | null;
   listings: (Listing & { info: CardInfo | null })[];
 }
@@ -156,6 +164,8 @@ export interface SearchResponse {
   known: boolean;
   /** si no hubo resultados: nombres parecidos para probar */
   didYouMean?: string[];
+  /** la carta se buscó con su nombre en inglés y en español */
+  names?: { en: string; es: string; typed: "en" | "es" };
 }
 
 /** Una publicación guardada en el catálogo indexado */

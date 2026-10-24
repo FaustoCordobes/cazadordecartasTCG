@@ -10,6 +10,8 @@ export interface GameMeta {
   /** cómo se escribe en los links compartidos (?juego=...) */
   param: string;
   placeholder: string;
+  /** se puede buscar por el nombre en español (además del inglés) */
+  bilingual?: boolean;
   quick: string[];
   rarityOrder: string[];
   rarityLabel?: Record<string, string>;
@@ -23,6 +25,7 @@ export const GAMES: Record<Game, GameMeta> = {
   ygo: {
     id: "ygo", name: "Yu-Gi-Oh!", short: "Yu-Gi-Oh!", emblem: "YG", param: "yugioh",
     placeholder: "Ash Blossom, Mago Oscuro, RA01-EN008",
+    bilingual: true,
     quick: ["Ash Blossom", "Dark Magician", "Mago Oscuro", "Blue-Eyes White Dragon"],
     rarityOrder: ["Common", "Rare", "Super Rare", "Ultra Rare", "Secret Rare", "Ultimate Rare", "Ghost Rare", "Starlight Rare",
       "Platinum Secret Rare", "Prismatic Secret Rare", "Prismatic Collector's Rare", "Quarter Century Secret Rare"],
@@ -52,6 +55,7 @@ Uzuhime the Manifested Mikanko x2`,
   mtg: {
     id: "mtg", name: "Magic: The Gathering", short: "Magic", emblem: "MTG", param: "magic",
     placeholder: "Sol Ring, Rayo, Lightning Bolt",
+    bilingual: true,
     quick: ["Sol Ring", "Lightning Bolt", "Counterspell", "Rhystic Study"],
     rarityOrder: ["Común", "Infrecuente", "Rara", "Mítica", "Especial"],
     deckExample: `4 Lightning Bolt
@@ -63,7 +67,8 @@ Uzuhime the Manifested Mikanko x2`,
   },
   pkm: {
     id: "pkm", name: "Pokémon TCG", short: "Pokémon", emblem: "PK", param: "pokemon",
-    placeholder: "Pikachu, Charizard ex, 125/197",
+    placeholder: "Pikachu, Investigación de Profesores, 125/197",
+    bilingual: true,
     quick: ["Pikachu", "Charizard ex", "Gardevoir ex", "Iono"],
     rarityOrder: ["Common", "Uncommon", "Rare", "Rare Holo", "Double Rare", "Ultra Rare", "Illustration Rare",
       "Special Illustration Rare", "Hyper Rare", "Secret Rare", "ACE SPEC Rare", "Shiny Rare", "Promo"],

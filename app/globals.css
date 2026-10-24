@@ -486,3 +486,112 @@ input[type=email], input[type=url], input[type=text], input:not([type]), input[i
   background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:10px 12px; color:var(--ink); font:inherit; width:100%; min-width:0}
 input[type=email]:focus, input[type=url]:focus, input[type=text]:focus, input:not([type]):focus{border-color:var(--accent)}
 .offer-head span:nth-child(4){text-align:right}
+
+/* ===== v10: diseño para celular ===== */
+@media (max-width:860px){ .o-actions{grid-area:go} }
+.also-in-d{flex-basis:100%}
+.also-in-d > summary{cursor:pointer; font-size:.85rem; font-weight:600; color:var(--accent); min-height:36px; display:flex; align-items:center}
+.also-in-d[open] > summary{margin-bottom:6px}
+.mode-tabs{flex-wrap:nowrap}
+.mode-tabs button{white-space:nowrap}
+
+@media (max-width:560px){
+  body{font-size:15px}
+  .wrap{gap:14px; padding-left:max(12px, env(safe-area-inset-left, 0px)); padding-right:max(12px, env(safe-area-inset-right, 0px)); padding-top:12px}
+  .lg{display:none}
+  .brand h1{font-size:1.3rem}
+  .brand p{font-size:.78rem}
+  .top{gap:8px}
+  .top-actions{gap:6px}
+  .aviso-corto{font-size:.8rem}
+  .step{margin-bottom:6px}
+  .step h2{font-size:1rem}
+
+  /* juegos: los 5 a la vista, sin scroll */
+  .games{display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:6px; overflow:visible; padding:0}
+  .game{flex-direction:column; align-items:center; text-align:center; gap:4px; padding:8px 2px; min-height:0}
+  .game small{display:none}
+  .game strong{font-size:.7rem; line-height:1.15; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:100%}
+  .emb{width:34px; height:34px; font-size:.7rem}
+  .g-mtg .emb{font-size:.6rem}
+
+  /* pestañas en una línea, repartidas */
+  .mode-tabs{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:0}
+  .mode-tabs button{padding:10px 4px; font-size:.85rem; overflow:hidden; text-overflow:ellipsis}
+
+  .panel{padding:12px; gap:12px}
+  .search{gap:8px}
+  .search .field{flex-basis:100%}
+  .search > .btn{flex:1 1 auto}
+  .quick{font-size:.78rem}
+
+  /* tarjeta de carta: imagen chica + título arriba, el resto a todo el ancho */
+  .card{grid-template-columns:52px minmax(0,1fr); gap:8px 10px; padding:10px; align-items:start}
+  .card > .info{display:contents}
+  .card > .info > .ttl{grid-column:2; display:block}
+  .card > .info > *:not(.ttl){grid-column:1 / -1}
+  .card .ttl h3{font-size:1.05rem}
+  .card .from{text-align:left; margin-top:4px; display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px}
+  .card .from b{font-size:1.1rem}
+  .thumb{padding:3px}
+  .thumb .tn, .thumb .tc{display:none}
+  .card-actions{display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px}
+  .card-actions .btn{padding:6px 4px; font-size:.8rem; justify-content:center}
+  .store-card{display:block}
+
+  /* cada tienda: nombre y precio arriba, publicación, stock y botones en una fila */
+  .offer{grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"store price" "print print" "stock stock" "go go"; gap:6px 10px; padding:10px}
+  .o-store b{font-size:.92rem}
+  .o-store span, .o-store small{font-size:.72rem}
+  .o-actions{flex-direction:row; flex-wrap:wrap; align-items:center; gap:6px}
+  .o-actions .o-go{flex:1 1 auto; min-height:40px; display:flex; align-items:center; justify-content:center}
+  .o-actions .o-add{min-height:40px}
+  .o-actions .o-rep{min-height:40px; padding:0 4px}
+  .o-stock{font-size:.8rem}
+
+  /* listado / optimizador */
+  .stats{grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px}
+  .stat{padding:10px}
+  .stat b{font-size:1.15rem}
+  .strategies{grid-template-columns:repeat(3,minmax(0,1fr)); gap:6px}
+  .strat{padding:8px; gap:0}
+  .strat b{font-size:.78rem; line-height:1.2}
+  .strat-total{font-size:.92rem}
+  .strat small{font-size:.66rem}
+  .totals{grid-template-columns:repeat(2,minmax(0,1fr)); padding:10px}
+  .opt-opts{grid-template-columns:1fr; gap:10px}
+  .tabs:not(.mode-tabs){flex-wrap:nowrap; overflow-x:auto}
+  .tabs:not(.mode-tabs) button{white-space:nowrap; padding:8px 10px}
+  .deck-items li{gap:8px}
+  .tbl{overflow-x:auto}
+  .wish-row{gap:8px}
+  .wish-row .field.grow{flex-basis:100%}
+  .list-bar .btn{flex:1 1 auto}
+
+  /* directorio */
+  .dir-grid{grid-template-columns:1fr}
+  .dir-filters{flex-wrap:nowrap; overflow-x:auto; padding-bottom:4px}
+  .dir-chip{flex:none}
+  .dir-only{flex:none}
+
+  footer{flex-direction:column; align-items:flex-start}
+  .toast{left:12px; right:12px; transform:none; max-width:none}
+}
+@media (max-width:560px){
+  .card.wish{display:block}
+  .card.wish > .info, .store-card > .info{display:flex}
+}
+
+/* ---------- v11: nombres en dos idiomas y guía de precios ---------- */
+.alt-name{display:block; font-size:.82rem; color:var(--muted); margin:.1rem 0 .25rem}
+.translated.bilingual{background:var(--info-soft); color:var(--ink); border-radius:var(--r); padding:.55rem .75rem}
+.pguide{display:flex; flex-wrap:wrap; gap:.4rem; margin:.5rem 0 0}
+.pguide > div{background:var(--surface-2); border:1px solid var(--line); border-radius:8px; padding:.3rem .6rem; min-width:0}
+.pguide dt{font-size:.7rem; color:var(--muted); text-transform:uppercase; letter-spacing:.03em}
+.pguide dd{margin:0; font-family:var(--f-mono); font-weight:600; font-size:.92rem}
+.pguide dd small{font-family:var(--f-body); font-weight:400; color:var(--muted); font-size:.78rem}
+@media (max-width:560px){
+  .pguide{grid-column:1/-1}
+  .pguide > div{flex:1 1 30%}
+}
+.lbl-hint{font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted)}

@@ -100,8 +100,15 @@ export interface YgoApiCard {
   attribute?: string;
   level?: number;
   linkval?: number;
-  card_sets?: { set_code: string; set_rarity: string }[];
+  card_sets?: { set_code: string; set_rarity: string; set_price?: string }[];
 }
+
+/** Número positivo o nada (las bases a veces mandan "0.00" o null cuando no hay precio) */
+const price = (v: unknown): number | null => {
+  const n = typeof v === "string" ? parseFloat(v) : typeof v === "number" ? v : NaN;
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+};
+const TCGP = "TCGplayer";
 
 export function ygoInfo(c: YgoApiCard): CardInfo {
   if (c.frameType === "spell" || c.frameType === "trap") {
@@ -134,7 +141,15 @@ async function ygoLookup(name: string): Promise<InfoIndex> {
   for (const c of cards.slice(0, 40)) {
     const info = ygoInfo(c);
     idx.byName.set(norm(c.name), info);
-    for (const s of c.card_sets ?? []) idx.byCode.set(s.set_code.toUpperCase(), info);
+    // Precio de referencia por código y rareza (el mismo código puede salir en varias rarezas)
+    const byCode = new Map<string, Record<string, number>>();
+    for (const s of c.card_sets ?? []) {
+      const code = s.set_code.toUpperCase();
+      if (!byCode.has(code)) byCode.set(code, {});
+      const p = price(s.set_price);
+      if (p) byCode.get(code)![norm(s.set_rarity)] = p;
+    }
+    for (const [code, prices] of byCode) idx.byCode.set(code, Object.keys(prices).length ? { ...info, ref: { src: TCGP, prices } } : info);
   }
   return idx;
 }
@@ -159,6 +174,7 @@ export interface ScryfallCard {
   cmc?: number;
   image_uris?: { small?: string };
   card_faces?: { type_line?: string; colors?: string[]; image_uris?: { small?: string } }[];
+  prices?: { usd?: string | null; usd_foil?: string | null; usd_etched?: string | null };
 }
 
 export function mtgInfo(c: ScryfallCard): CardInfo {
@@ -174,7 +190,17 @@ export function mtgInfo(c: ScryfallCard): CardInfo {
     rarity: M_RAR[c.rarity] ?? c.rarity,
     setName: c.set_name,
     image: c.image_uris?.small ?? c.card_faces?.[0]?.image_uris?.small,
+    ...mtgRef(c),
   };
+}
+
+function mtgRef(c: ScryfallCard): Pick<CardInfo, "ref"> {
+  const prices: Record<string, number> = {};
+  const n = price(c.prices?.usd);
+  const f = price(c.prices?.usd_foil) ?? price(c.prices?.usd_etched);
+  if (n) prices.normal = n;
+  if (f) prices.foil = f;
+  return Object.keys(prices).length ? { ref: { src: TCGP, prices } } : {};
 }
 
 async function mtgLookup(name: string): Promise<InfoIndex> {
@@ -197,33 +223,22 @@ async function mtgLookup(name: string): Promise<InfoIndex> {
   for (const c of cards.slice(0, 120)) {
     const info = mtgInfo(c);
     idx.byCode.set(`${c.set.toUpperCase()}-${c.collector_number}`, info);
+    // Por edición (las tiendas casi nunca ponen el número): la impresión más barata de esa edición
+    // (clave con el nombre: al juntar fichas de varias cartas, cada una conserva la suya)
+    const setKeys = [...new Set([c.name, c.name.split(" // ")[0]])].flatMap((n) => [`${norm(n)}@${c.set.toUpperCase()}`, `${norm(n)}@${norm(c.set_name)}`]);
+    for (const k of setKeys) {
+      const prev = idx.byCode.get(k);
+      if (!prev) { idx.byCode.set(k, info); continue; }
+      const pp = { ...(prev.ref?.prices ?? {}) };
+      for (const [kk, v] of Object.entries(info.ref?.prices ?? {})) if (!pp[kk] || v < pp[kk]) pp[kk] = v;
+      if (Object.keys(pp).length) idx.byCode.set(k, { ...prev, ref: { src: TCGP, prices: pp } });
+    }
     // por nombre se guarda la impresión sin rareza (cambia entre impresiones)
-    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined });
+    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined, ref: undefined });
     // las cartas de dos caras también se encuentran por cada cara
-    for (const face of c.name.split(" // ")) if (!idx.byName.has(norm(face))) idx.byName.set(norm(face), { ...info, name: c.name, rarity: undefined, setName: undefined });
+    for (const face of c.name.split(" // ")) if (!idx.byName.has(norm(face))) idx.byName.set(norm(face), { ...info, name: c.name, rarity: undefined, setName: undefined, ref: undefined });
   }
   return idx;
-}
-
-/** Magic: si el usuario escribe el nombre en español ("Rayo"), lo pasa al inglés */
-const mtgEnCache = new TTLCache<string | null>(24 * 60 * 60 * 1000);
-export async function mtgEnglishName(q: string): Promise<string | null> {
-  const key = norm(q);
-  const hit = mtgEnCache.get(key);
-  if (hit !== undefined) return hit;
-  let result: string | null = null;
-  try {
-    const data = await getJSON<{ data: { name: string; printed_name?: string }[] }>(
-      `https://api.scryfall.com/cards/search?q=${encodeURIComponent(`lang:es "${q}"`)}&include_multilingual=true&unique=cards`
-    );
-    const list = data.data ?? [];
-    const exact = list.find((c) => norm(c.printed_name) === key) ?? list.find((c) => norm(c.printed_name).startsWith(key));
-    result = exact?.name ?? null;
-  } catch {
-    result = null;
-  }
-  mtgEnCache.set(key, result);
-  return result;
 }
 
 /** Magic: nombre correcto a partir de uno mal escrito ("lightnin bolt" → "Lightning Bolt") */
@@ -257,6 +272,7 @@ export interface PkmApiCard {
   number: string;
   set: { id: string; name: string; printedTotal: number; ptcgoCode?: string };
   images?: { small?: string };
+  tcgplayer?: { prices?: Record<string, { market?: number | null; mid?: number | null } | undefined> };
 }
 
 export function pkmInfo(c: PkmApiCard): CardInfo {
@@ -272,7 +288,17 @@ export function pkmInfo(c: PkmApiCard): CardInfo {
     rarity: c.rarity,
     setName: c.set.name,
     image: c.images?.small,
+    ...pkmRef(c),
   };
+}
+
+function pkmRef(c: PkmApiCard): Pick<CardInfo, "ref"> {
+  const prices: Record<string, number> = {};
+  for (const [k, v] of Object.entries(c.tcgplayer?.prices ?? {})) {
+    const p = price(v?.market) ?? price(v?.mid);
+    if (p) prices[k] = p;
+  }
+  return Object.keys(prices).length ? { ref: { src: TCGP, prices } } : {};
 }
 
 async function pkmLookup(name: string): Promise<InfoIndex> {
@@ -283,7 +309,7 @@ async function pkmLookup(name: string): Promise<InfoIndex> {
   try {
     const q = words.map((w) => `name:"${w}*"`).join(" ");
     const data = await getJSON<{ data: PkmApiCard[] }>(
-      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=150&orderBy=-set.releaseDate&select=id,name,supertype,subtypes,types,rarity,number,set,images`,
+      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=150&orderBy=-set.releaseDate&select=id,name,supertype,subtypes,types,rarity,number,set,images,tcgplayer`,
       12000
     );
     cards = data.data ?? [];
@@ -294,7 +320,7 @@ async function pkmLookup(name: string): Promise<InfoIndex> {
     const info = pkmInfo(c);
     idx.byCode.set(`${c.number}/${c.set.printedTotal}`.toUpperCase(), info);
     idx.byCode.set(c.number.toUpperCase().replace(/\s/g, ""), info); // promos: SWSH001, SVP050
-    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined });
+    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined, ref: undefined });
   }
   return idx;
 }
@@ -315,6 +341,7 @@ export interface OpApiCard {
   sub_types?: string | null;
   attribute?: string | null;
   card_image?: string | null;
+  market_price?: number | string | null;
 }
 
 /** "Roronoa Zoro (025) (Parallel)" → "Roronoa Zoro" */
@@ -345,8 +372,15 @@ async function opLookup(name: string): Promise<InfoIndex> {
     if (r.status !== "fulfilled" || !Array.isArray(r.value)) continue;
     for (const c of r.value) {
       const info = opInfo(c);
-      // la versión normal manda; la Parallel comparte código
-      if (!idx.byCode.has(c.card_set_id) || !/parallel/i.test(c.card_name)) idx.byCode.set(c.card_set_id.toUpperCase(), info);
+      const code = c.card_set_id.toUpperCase();
+      const parallel = /parallel|alternate art|manga/i.test(c.card_name);
+      // la versión normal manda; la Parallel comparte código (su precio se guarda aparte)
+      const prev = idx.byCode.get(code);
+      const prices = { ...(prev?.ref?.prices ?? {}) };
+      const p = price(c.market_price);
+      if (p && !prices[parallel ? "parallel" : "normal"]) prices[parallel ? "parallel" : "normal"] = p;
+      const base = !prev || !parallel ? info : prev;
+      idx.byCode.set(code, Object.keys(prices).length ? { ...base, ref: { src: TCGP, prices } } : base);
       if (!idx.byName.has(norm(info.name))) idx.byName.set(norm(info.name), { ...info, rarity: undefined, setName: undefined, image: undefined });
     }
   }
@@ -377,33 +411,4 @@ export async function lookupInfo(game: Game, names: string[]): Promise<InfoIndex
     r.value.byName.forEach((v, k) => merged.byName.set(k, v));
   }
   return merged;
-}
-
-/**
- * Yu-Gi-Oh!: si el usuario escribe el nombre en español ("mago oscuro"),
- * lo traduce al nombre en inglés, que es como publican las tiendas.
- */
-const enNameCache = new TTLCache<string | null>(24 * 60 * 60 * 1000);
-
-export async function ygoEnglishName(q: string): Promise<string | null> {
-  const key = norm(q);
-  const hit = enNameCache.get(key);
-  if (hit !== undefined) return hit;
-  const result = await ygoEnglishNameUncached(q);
-  enNameCache.set(key, result);
-  return result;
-}
-
-async function ygoEnglishNameUncached(q: string): Promise<string | null> {
-  try {
-    const es = await getJSON<{ data: { id: number; name: string }[] }>(
-      `https://db.ygoprodeck.com/api/v7/cardinfo.php?fname=${encodeURIComponent(q)}&language=es`
-    );
-    const first = es.data?.find((c) => norm(c.name) === norm(q)) ?? es.data?.[0];
-    if (!first) return null;
-    const en = await getJSON<{ data: { name: string }[] }>(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${first.id}`);
-    return en.data?.[0]?.name ?? null;
-  } catch {
-    return null;
-  }
 }

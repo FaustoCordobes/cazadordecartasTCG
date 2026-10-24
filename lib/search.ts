@@ -2,8 +2,10 @@ import type { CardGroup, CardInfo, Game, Listing, MissingVersion, RawListing, Se
 import { STORES } from "./stores.ts";
 import { LIVE_ADAPTERS } from "./adapters/index.ts";
 import { robotsAllows } from "./robots.ts";
-import { digiImage, lookupInfo, mtgEnglishName, mtgFuzzyName, ygoEnglishName, type InfoIndex } from "./cardinfo.ts";
+import { digiImage, lookupInfo, mtgFuzzyName, type InfoIndex } from "./cardinfo.ts";
+import { isSpanishTitle, nameKey, translateName, type NamePair } from "./names.ts";
 import { suggest } from "./suggest.ts";
+import { setKey } from "./deck.ts";
 import { SEALED } from "./games.ts";
 import { matchesQuery, mtgRarity, norm, parseTitle, pkmRarity } from "./parse.ts";
 import { TTLCache } from "./cache.ts";
@@ -31,6 +33,11 @@ function attachInfo(game: Game, l: Listing, idx: InfoIndex): CardInfo | null {
   if (l.code) {
     const byCode = idx.byCode.get(l.code.toUpperCase());
     if (byCode) return byCode;
+  }
+  // Magic: sin número de coleccionista, la edición alcanza para la imagen y el precio de referencia
+  if (game === "mtg" && l.set) {
+    const bySet = idx.byCode.get(`${norm(l.parsedName)}@${l.set.toUpperCase()}`) ?? idx.byCode.get(`${norm(l.parsedName)}@${norm(l.set)}`);
+    if (bySet) return bySet;
   }
   // Por nombre solo cuando coincide exacto: en Digimon cada impresión puede tener
   // otro color, así que sin código no se inventan datos.
@@ -145,6 +152,21 @@ export function groupListings(game: Game, listings: Listing[], idx: InfoIndex, q
     if (!g.info && info) g.info = info;
     g.listings.push({ ...l, info });
   }
+  // Digimon / One Piece: si una tienda no publica el código (Casco pone solo la expansión), sus publicaciones
+  // se suman a la versión con código del mismo nombre, expansión y variante, cuando hay una sola posible.
+  if (game === "digi" || game === "op") {
+    const coded = [...groups.values()].filter((g) => g.code);
+    for (const g of [...groups.values()]) {
+      if (g.code || !g.setName) continue;
+      const sk = setKey(g.setName);
+      if (!sk) continue;
+      const n = norm(g.name);
+      const target = coded.filter((c) => norm(c.name) === n && setKey(c.code!.split("-")[0]) === sk && (c.version ?? null) === (g.version ?? null) && (c.lang ?? null) === (g.lang ?? null));
+      if (target.length !== 1) continue;
+      target[0].listings.push(...g.listings);
+      groups.delete(g.key);
+    }
+  }
   const cards = [...groups.values()];
   for (const c of cards) {
     c.listings.sort(
@@ -172,15 +194,20 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
   const cached = searchCache.get(key);
   if (cached) return cached;
 
-  // 1) Qué texto mandar a las tiendas (Yu-Gi-Oh!: traduce nombres en español)
+  // 1) Qué texto mandar a las tiendas: el nombre en inglés y también el nombre en español,
+  //    porque cada tienda publica con el de la impresión que tiene (ver lib/names.ts)
   let query = q.trim();
-  if ((game === "ygo" || game === "mtg") && !looksLikeCode(query)) {
-    const en = game === "ygo" ? await ygoEnglishName(query) : await mtgEnglishName(query);
-    if (en && norm(en) !== norm(query)) query = en.split(" // ")[0];
-  }
+  const names: NamePair | null = looksLikeCode(query) ? null : await translateName(game, query);
+  if (names?.typed === "es") query = names.en;
+  const variants = names ? [...new Set([query, names.es])] : [query];
   // La ficha oficial se busca antes, para reconocer nombres en los títulos de las tiendas
   const idxQuery = await lookupInfo(game, [query]);
-  const relevant = (title: string) => matchesQuery(title, query) || (looksLikeCode(q) && matchesQuery(title, q));
+  const relevant = (title: string) => variants.some((v) => matchesQuery(title, v)) || (looksLikeCode(q) && matchesQuery(title, q));
+  /** Publicación escrita en español: se agrupa con el nombre oficial en inglés y se marca el idioma */
+  const unify = (ls: Listing[]) =>
+    names
+      ? ls.map((l) => (isSpanishTitle(names, l.parsedName, l.title) ? { ...l, parsedName: names.en, lang: l.lang ?? "Español" } : l))
+      : ls;
 
   const stores = STORES.filter((s) => s.games.includes(game));
   const statuses: StoreStatus[] = [];
@@ -229,14 +256,26 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
           statuses.push({ ...base, ms: Date.now() - t0, error: "Su robots.txt no permite esta búsqueda" });
           return;
         }
-        const ck = `${s.id}:${game}:${norm(query)}`;
-        let fetched = storeCache.get(ck);
-        if (!fetched) {
-          fetched = await adapter.search(s, query, game);
-          storeCache.set(ck, fetched);
+        // Un pedido por nombre (inglés y español), uno detrás del otro para no cargar a la tienda
+        const fetched: RawListing[] = [];
+        const seen = new Set<string>();
+        for (const [i, v] of variants.entries()) {
+          if (i > 0 && !(await robotsAllows(s.base, adapter.path(v, s, game)))) continue;
+          const ck = `${s.id}:${game}:${norm(v)}`;
+          let got = storeCache.get(ck);
+          if (!got) {
+            try {
+              got = await adapter.search(s, v, game);
+            } catch (e) {
+              if (i === 0) throw e;
+              continue; // si falla solo la búsqueda en español, se sigue con lo que hay
+            }
+            storeCache.set(ck, got);
+          }
+          for (const r of got) if (!seen.has(r.url)) { seen.add(r.url); fetched.push(r); }
         }
         const raw = fetched.filter((r) => relevant(r.name ?? r.title));
-        const ls = toListings(game, s, platform as Listing["platform"], "live", raw, idxQuery);
+        const ls = unify(toListings(game, s, platform as Listing["platform"], "live", raw, idxQuery));
         listings.push(...ls);
         statuses.push({ ...base, ok: true, count: ls.length, ms: Date.now() - t0 });
       } catch (e) {
@@ -252,11 +291,12 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
     const db = catalog();
     const ids = indexStores.map((x) => x.store.id);
     try {
-      const [items, idxStatus] = await Promise.all([db.search(game, queryWords(query), ids), db.statuses(game)]);
+      const [found, idxStatus] = await Promise.all([Promise.all(variants.map((v) => db.search(game, queryWords(v), ids))), db.statuses(game)]);
+      const items = [...new Map(found.flat().map((i) => [`${i.storeId}|${i.url}`, i])).values()];
       for (const { store, platform } of indexStores) {
         const st = idxStatus.find((x) => x.storeId === store.id);
         const raw = items.filter((i) => i.storeId === store.id && relevant(i.title));
-        const ls = toListings(game, store, platform, "index", raw, idxQuery);
+        const ls = unify(toListings(game, store, platform, "index", raw, idxQuery));
         listings.push(...ls);
         statuses.push({
           id: store.id, name: store.name, domain: store.domain, platform: store.platform, mode: "index",
@@ -276,11 +316,12 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
   }
 
   // 4) Ficha oficial de cada carta (lo que buscó el usuario + hasta 5 nombres encontrados)
-  const names = [...new Set([query, ...listings.map((l) => l.parsedName)])].slice(0, 6);
-  const idx = await lookupInfo(game, names);
+  const infoNames = [...new Set([query, ...listings.map((l) => l.parsedName)])].slice(0, 6);
+  const idx = await lookupInfo(game, infoNames);
 
   // 5) Agrupar por VERSIÓN (ver groupListings)
   const cards = groupListings(game, listings, idx, query, q);
+  if (names) for (const c of cards) if (nameKey(c.name) === nameKey(names.en)) c.altName = names.es;
 
   // 6) Digimon: versiones que existen (base oficial) pero ninguna tienda tiene publicadas
   const missing: MissingVersion[] = [];
@@ -315,6 +356,7 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
     q,
     query,
     didYouMean,
+    names: names ?? undefined,
     searchedAt: new Date().toISOString(),
     stores: statuses.sort((a, b) => Number(b.ok) - Number(a.ok) || b.count - a.count || a.name.localeCompare(b.name)),
     cards,
