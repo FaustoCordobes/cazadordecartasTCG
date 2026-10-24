@@ -68,3 +68,10 @@ test("robots.txt: Tiendanube bloquea /search, Shopify permite suggest.json", () 
   assert.equal(isPathAllowed(shop, "/search/suggest.json?q=x"), true);
   assert.equal(isPathAllowed(shop, "/search?q=x"), false);
 });
+
+test("Digimon: el nombre de la expansión de Casco (BT-23: ...) no es un código de carta", () => {
+  assert.equal(parseDigimon("BanchoLeomon · R · BT-23: Hackers' Slumber").code, null);
+  assert.equal(parseDigimon("BanchoLeomon · U · EX-5: Animal Colosseum").code, null);
+  assert.equal(parseDigimon("Gabumon P-001").code, "P-001");
+  assert.equal(parseDigimon("Bancholeomon BT20-036-U").code, "BT20-036");
+});

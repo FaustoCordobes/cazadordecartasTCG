@@ -73,3 +73,14 @@ test("Digimon: las publicaciones sin código (Casco) se suman a la versión con 
   assert.deepEqual(main.listings.map((l) => l.storeId).sort(), ["casco", "rancho"]);
   assert.equal(g.length, 2, "la de otra expansión queda aparte");
 });
+
+test("Digimon: no se suma a la versión con código si la rareza no coincide (promo con sello u otra carta)", () => {
+  const idx = { byCode: new Map(), byName: new Map() };
+  const base = { set: null, version: "Normal", parsedName: "BanchoLeomon" };
+  const g = groupListings("digi", [
+    L({ ...base, storeId: "rancho", code: "BT23-036", set: "BT23", rarity: "U" }),
+    L({ ...base, storeId: "casco", code: null, set: "BT-23: Hackers' Slumber", rarity: "R" }),
+  ], idx, "BanchoLeomon");
+  assert.equal(g.length, 2);
+  assert.deepEqual(g.find((x) => x.code === "BT23-036")!.listings.map((l) => l.storeId), ["rancho"]);
+});
