@@ -595,3 +595,6 @@ input[type=email]:focus, input[type=url]:focus, input[type=text]:focus, input:no
   .pguide > div{flex:1 1 30%}
 }
 .lbl-hint{font-weight:400; text-transform:none; letter-spacing:0; color:var(--muted)}
+.manual-box{margin-top:14px; border:1px dashed var(--line); border-radius:var(--r); padding:12px 14px; background:var(--surface)}
+.manual-box h3{margin:0 0 4px; font-size:1rem}
+.manual-box .also-in{margin-top:8px}

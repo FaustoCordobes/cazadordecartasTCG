@@ -53,14 +53,17 @@ export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): D
   // Algunas tiendas (Casco) no publican el código de la carta, solo la expansión ("BT-20: ...").
   // Ahí se acepta la carta si coincide el nombre y la expansión es la del código pedido.
   const loose = new Set<string>();
+  const codedRarity = byCode ? res.cards.find((g) => g.code?.toUpperCase() === entry.code!.toUpperCase() && g.rarity)?.rarity ?? null : null;
   const groups = res.cards.filter((g) => {
     if (byCode) {
       if (g.code) return g.code.toUpperCase() === entry.code!.toUpperCase();
       const nameOk = sameName(g.name) || (!!g.info && sameName(g.info.name));
       const promo = /^P-?\d/i.test(entry.code!);
       const setOk = !!g.setName && (promo ? /promo/i.test(g.setName) : !!wantSet && setKey(g.setName) === wantSet);
-      if (nameOk && setOk) loose.add(g.key);
-      return nameOk && setOk;
+      // si otra tienda publica ese código con su rareza, la rareza tiene que coincidir
+      const rarOk = !g.rarity || !codedRarity || g.rarity === codedRarity;
+      if (nameOk && setOk && rarOk) loose.add(g.key);
+      return nameOk && setOk && rarOk;
     }
     return sameName(g.name) || (g.info && sameName(g.info.name));
   });

@@ -774,6 +774,22 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                 </div>
               </div>
             )}
+            {data && !loading && extraStores.length > 0 && (
+              <div className="manual-box">
+                <h3>¿No está o querés comparar más? Buscala en estas tiendas</h3>
+                <p className="translated">
+                  Estas tiendas también venden {GAMES[game].short}, pero la app no puede consultarlas sola (por ejemplo, su protección anti-bots
+                  lo bloquea). El botón abre su web con la búsqueda; sus precios no aparecen arriba.
+                </p>
+                <div className="also-in">
+                  {extraStores.map((s) => (
+                    <a key={s.id} className="chip-link" href={linkFor(s, game, data.query)} target="_blank" rel="noopener" onClick={() => trackClick(game, s.id)} title={s.note}>
+                      {s.searchUrl ? `Buscar en ${s.name}` : s.name} ↗
+                    </a>
+                  ))}
+                </div>
+              </div>
+            )}
           </section>
         )}
 

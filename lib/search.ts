@@ -161,7 +161,10 @@ export function groupListings(game: Game, listings: Listing[], idx: InfoIndex, q
       const sk = setKey(g.setName);
       if (!sk) continue;
       const n = norm(g.name);
-      const target = coded.filter((c) => norm(c.name) === n && setKey(c.code!.split("-")[0]) === sk && (c.version ?? null) === (g.version ?? null) && (c.lang ?? null) === (g.lang ?? null));
+      const target = coded.filter((c) =>
+        norm(c.name) === n && setKey(c.code!.split("-")[0]) === sk && (c.version ?? null) === (g.version ?? null) && (c.lang ?? null) === (g.lang ?? null) &&
+        // si las dos dicen la rareza y no coincide, es otra carta de la misma expansión (o una promo con sello)
+        (!c.rarity || !g.rarity || c.rarity === g.rarity));
       if (target.length !== 1) continue;
       target[0].listings.push(...g.listings);
       groups.delete(g.key);

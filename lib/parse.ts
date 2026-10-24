@@ -33,7 +33,9 @@ export interface Parsed {
 }
 
 // ---------- Digimon ----------
-const DIGI_CODE = /\b((?:BT|EX|ST|AD|RB|LM|BO|P)\d{0,2}-\d{2,3})(?:-(C|U|R|SR|SEC|UR|P))?\b/i;
+// El número de la expansión es obligatorio salvo en las promos (P-001): "BT-23: Hackers' Slumber"
+// (como titula Casco) es el nombre de la expansión, no el código de una carta.
+const DIGI_CODE = /\b((?:(?:BT|EX|ST|AD|RB|LM|BO)\d{1,2}|P)-\d{2,3})(?:-(C|U|R|SR|SEC|UR|P))?\b/i;
 
 export function parseDigimon(title: string): Parsed {
   const m = title.match(DIGI_CODE);
