@@ -65,3 +65,25 @@ test("Sugerencias: primero las que empiezan con lo escrito", () => {
   const list = rank([{ name: "Kashtira Ash Blossom" }, { name: "Ash Blossom & Joyous Spring" }, { name: "Lonefire Blossom" }, { name: "Ash Blossom & Joyous Spring" }], "ash");
   assert.deepEqual(list.map((s) => s.name), ["Ash Blossom & Joyous Spring", "Kashtira Ash Blossom", "Lonefire Blossom"]);
 });
+
+test("Digimon: acepta tiendas sin código si coinciden nombre y expansión (Casco)", async () => {
+  const { matchEntry, setKey } = await import("../lib/deck.ts");
+  assert.equal(setKey("BT-20: Over the X"), "BT20");
+  assert.equal(setKey("BT20"), "BT20");
+  assert.equal(setKey("OP-01: Romance Dawn"), "OP1");
+  const L = (store: string, price: number) => ({ storeId: store, storeName: store, storeCity: null, hasLocal: true, title: "t", price, available: true, stock: 2, url: `https://${store}/${price}`, code: null });
+  const res = {
+    game: "digi", q: "BanchoLeomon", query: "BanchoLeomon", searchedAt: "", stores: [], missing: [], known: true,
+    cards: [
+      { key: "a", name: "BanchoLeomon", code: "BT20-036", rarity: "SR", version: null, setName: "BT20", info: null, listings: [{ ...L("rancho", 900), code: "BT20-036" }] },
+      { key: "b", name: "BanchoLeomon", code: null, rarity: "SR", version: null, setName: "BT-20: Over the X", info: null, listings: [L("casco", 700)] },
+      { key: "c", name: "BanchoLeomon", code: null, rarity: "SR", version: null, setName: "BT-10: Xros Encounter", info: null, listings: [L("casco", 300)] },
+    ],
+  } as never;
+  const card = matchEntry("digi", { qty: 4, name: "BanchoLeomon", code: "BT20-036", line: 1, raw: "" }, res);
+  assert.deepEqual(card.offers.map((o) => [o.storeId, o.price, !!o.codeUnverified]), [["casco", 700, true], ["rancho", 900, false]]);
+  const promo = matchEntry("digi", { qty: 1, name: "Physical Training", code: "P-105", line: 1, raw: "" }, {
+    ...(res as object), cards: [{ key: "p", name: "Physical Training", code: null, rarity: "P", version: null, setName: "Promotion Cards", info: null, listings: [L("casco", 500)] }],
+  } as never);
+  assert.equal(promo.offers.length, 1);
+});

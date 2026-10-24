@@ -60,3 +60,16 @@ test("Fallas pasajeras: se reintentan; las permanentes no", async () => {
   assert.ok(!isTransient("Su robots.txt no permite esta búsqueda"));
   assert.ok(!isTransient(undefined));
 });
+
+test("Digimon: las publicaciones sin código (Casco) se suman a la versión con código", () => {
+  const idx = { byCode: new Map(), byName: new Map() };
+  const base = { set: null, rarity: "SR", version: "Normal", parsedName: "BanchoLeomon" };
+  const g = groupListings("digi", [
+    L({ ...base, storeId: "rancho", code: "BT20-036", set: "BT20" }),
+    L({ ...base, storeId: "casco", code: null, set: "BT-20: Over the X" }),
+    L({ ...base, storeId: "casco", code: null, set: "BT-10: Xros Encounter" }),
+  ], idx, "BanchoLeomon");
+  const main = g.find((x) => x.code === "BT20-036")!;
+  assert.deepEqual(main.listings.map((l) => l.storeId).sort(), ["casco", "rancho"]);
+  assert.equal(g.length, 2, "la de otra expansión queda aparte");
+});

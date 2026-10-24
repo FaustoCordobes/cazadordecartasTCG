@@ -7,7 +7,12 @@ Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **O
 ## Qué hace
 
 **Buscar una carta**
-- Por nombre (parcial, con o sin acentos), en inglés o español (Yu-Gi-Oh! y Magic se traducen solos) o por **código**: `RA01-EN008`, `BT19-070`, `OP01-025`, `125/197`.
+- Por nombre (parcial, con o sin acentos), en inglés o español, o por **código**: `RA01-EN008`, `BT19-070`, `OP01-025`, `125/197`.
+  En Yu-Gi-Oh!, Magic y Pokémon cada búsqueda se hace con **los dos nombres** (por ejemplo “Mago Oscuro” y “Dark Magician”),
+  porque las tiendas publican con el nombre de la impresión que tienen (`lib/names.ts`). Los nombres de Yu-Gi-Oh! en español
+  están en `lib/data/ygo-nombres.ts`; para actualizarlos: `npm run ygo-nombres`.
+- Guía de precios por versión, como TCGplayer: mediana publicada, copias en stock y precio de referencia de TCGplayer (EE. UU.)
+  convertido al dólar del día (`lib/refprice.ts`). Es solo una referencia: no incluye envío ni impuestos.
 - Autocompletado desde 2 letras, con imagen de la carta cuando la base oficial la tiene.
 - Resultados **progresivos**: aparecen a medida que responde cada tienda. Si una tienda falla, se marca "temporalmente no disponible" y el resto sigue.
 - Si no hay resultados: "¿quisiste decir?", búsqueda por código, links a tiendas con búsqueda manual y locales.
@@ -106,7 +111,7 @@ docs/PENDIENTES.md            lo que falta, riesgos y propuestas
 
 - Shopify devuelve como máximo 10 productos por tienda en cada búsqueda.
 - En Tiendanube, un stock vacío significa "ilimitado": se muestra "Disponible (sin cantidad)".
-- Phoenix Reborn usa una verificación de Cloudflare; si bloquea las consultas automáticas, aparece "temporalmente no disponible".
+- Phoenix Reborn responde 403 a los servidores (Cloudflare): está como búsqueda manual, con link a su buscador. Si la tienda habilita el User-Agent de Cazacartas, se puede volver a integrar.
 - Mi lista vive en el navegador: no se sincroniza entre dispositivos (usá exportar/importar).
 
 ---
