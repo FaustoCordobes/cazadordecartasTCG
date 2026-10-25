@@ -7,11 +7,17 @@ import { PROVINCES } from "@/lib/provinces.ts";
 const KEY = "cazacartas:provincia";
 let value = "";
 let loaded = false;
+let listening = false;
 const listeners = new Set<() => void>();
 
 function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
+  // al ingresar a la cuenta se puede traer la provincia guardada en otro dispositivo
+  if (!listening) {
+    listening = true;
+    window.addEventListener("cazacartas:ajustes-sync", () => { loaded = false; load(); listeners.forEach((l) => l()); });
+  }
   try {
     const v = window.localStorage.getItem(KEY) ?? "";
     value = PROVINCES.includes(v) ? v : "";
@@ -27,6 +33,7 @@ export function useProvince(): [string, (p: string) => void] {
   function set(p: string) {
     value = p;
     try { p ? window.localStorage.setItem(KEY, p) : window.localStorage.removeItem(KEY); } catch { /* sin almacenamiento */ }
+    try { window.dispatchEvent(new Event("cazacartas:ajustes")); } catch { /* nada */ }
     listeners.forEach((l) => l());
   }
   return [v, set];

@@ -5,11 +5,13 @@ import { STORES } from "@/lib/stores.ts";
 import type { CardGroup, Game, SearchResponse, StoreStatus } from "@/lib/types.ts";
 import { storesForGame } from "@/lib/directory.ts";
 import { Autocomplete } from "./Autocomplete.tsx";
+import { ScanCard } from "./ScanCard.tsx";
 import { Deck } from "./Deck.tsx";
 import { AvisoCompleto, AvisoCorto, AvisoTiendas } from "./Aviso.tsx";
 import { Donar } from "./Donar.tsx";
 import { QueEs } from "./QueEs.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
+import { AccountButton } from "./AccountButton.tsx";
 import { InstallApp } from "./InstallApp.tsx";
 import { ShareLinks } from "./ShareLinks.tsx";
 import { ProvinceSelect, useProvince } from "./useProvince.tsx";
@@ -408,8 +410,11 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
           </div>
           <nav className="top-actions" aria-label="Accesos">
             <button type="button" className="theme-btn" onClick={goList}><span aria-hidden="true">⭐</span><span>Mi lista{wish.count ? ` (${wish.count})` : ""}</span></button>
+            <a className="theme-btn" href={`/ofertas?juego=${GAMES[game].param}`}><span aria-hidden="true">🔥</span><span>Ofertas</span></a>
             <a className="theme-btn" href="/tiendas"><span aria-hidden="true">🏪</span><span>Tiendas</span></a>
+            <a className="theme-btn" href="/vender"><span aria-hidden="true">💱</span><span>Vender</span></a>
             <a className="theme-btn" href="/guia"><span aria-hidden="true">📘</span><span>Guía</span></a>
+            <AccountButton />
             <InstallApp />
             <ThemeToggle />
           </nav>
@@ -463,6 +468,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                 <span>Probá:</span>
                 {GAMES[game].quick.map((t) => <button key={t} type="button" onClick={() => search(t)}>{t}</button>)}
               </div>
+              <ScanCard game={game} onFound={(t) => search(t)} />
               <Populares game={game} onPick={(t) => search(t)} />
 
               {loading && (
@@ -693,6 +699,17 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                             </div>
                           )}
                         </dl>
+                      )}
+                      {(r.median || r.ref) && (
+                        <details className="pg-help">
+                          <summary>¿Qué significan estos precios?</summary>
+                          <ul>
+                            <li><b>Desde:</b> la publicación más barata con stock entre las tiendas consultadas.</li>
+                            <li><b>Mediana publicada:</b> el precio del medio entre las tiendas con stock (la mitad cobra menos y la mitad más). Sirve para saber cuánto cuesta “normalmente” sin que una oferta o un precio inflado engañen.</li>
+                            <li><b>Copias en stock:</b> la suma de las copias que informan las tiendas. Algunas no dicen cuántas tienen.</li>
+                            <li><b>Referencia TCGplayer:</b> precio de mercado en Estados Unidos (de ventas reales allá), pasado a pesos con el dólar del día. No incluye envío ni impuestos de importación: en Argentina suele costar más. Si una tienda la tiene bastante más barata, es una buena oferta.</li>
+                          </ul>
+                        </details>
                       )}
                       {r.condMix && <p className="warn-inline">⚠️ Hay publicaciones en distinto estado (NM, LP…). Fijate el estado de cada una antes de comparar precios.</p>}
                       <div className="card-actions">

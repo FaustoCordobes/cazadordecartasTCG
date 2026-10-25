@@ -9,11 +9,14 @@ import {
 } from "@/lib/wishlist.ts";
 import { useWishlist } from "./useWishlist.ts";
 import { search, searchMany } from "./searchClient.ts";
+import { PushAlerts } from "./PushAlerts.tsx";
+import { accountsEnabled, useAccount } from "./account.ts";
 
 const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 });
 
 export function Wishlist({ onSearch, onSearchAll }: { onSearch: () => void; onSearchAll?: (deckText: string, game: Game) => void }) {
   const w = useWishlist();
+  const acc = useAccount();
   const { items, list, state } = w;
   const [copied, setCopied] = useState(false);
   const [confirm, setConfirm] = useState<"clear" | "delete" | null>(null);
@@ -132,6 +135,9 @@ export function Wishlist({ onSearch, onSearchAll }: { onSearch: () => void; onSe
   return (
     <div className="group">
       {listBar}
+      {accountsEnabled && !acc.loading && (acc.user
+        ? <p className="hint">☁️ Guardada en tu cuenta ({acc.user.email}){acc.syncing ? " · guardando…" : ""}.</p>
+        : <p className="translated cloud-hint">☁️ Esta lista está solo en este navegador. <a href="/cuenta">Creá una cuenta gratis</a> para tenerla en todos tus dispositivos.</p>)}
       {w.saveError && <div className="err-box" role="alert">No se pudo guardar en este navegador (¿modo incógnito o memoria llena?). Exportá la lista para no perderla.</div>}
 
       <div className="stats">
@@ -153,7 +159,8 @@ export function Wishlist({ onSearch, onSearchAll }: { onSearch: () => void; onSe
           ))}
         </div>
         {checking && <span className="slow-note">Puede demorar unos segundos de más: buscamos cada carta en todas las tiendas.</span>}
-        <p className="hint">{lastCheck ? `Última revisión: ${agoText(lastCheck)}.` : "Todavía no revisaste precios."} Las alertas se revisan cuando abrís la app y tocás este botón: no te llegan avisos con la app cerrada.</p>
+        <p className="hint">{lastCheck ? `Última revisión: ${agoText(lastCheck)}.` : "Todavía no revisaste precios."} Las alertas se revisan cuando tocás este botón, o una vez por día si activás los avisos al celular.</p>
+        <PushAlerts items={items} />
         {shouldCheck && !checking && <p className="warn-inline">🔔 Tenés {withAlerts.length} alerta{withAlerts.length === 1 ? "" : "s"} configurada{withAlerts.length === 1 ? "" : "s"} sin revisar hace un rato. Tocá “Actualizar precios”.</p>}
         {alerts.length > 0 && (
           <div className="ok-box" role="status">

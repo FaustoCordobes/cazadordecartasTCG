@@ -8,7 +8,7 @@ import {
 
 /**
  * "Mi lista" (varias listas con nombre), compartida entre pantallas y guardada en este navegador.
- * No hay cuentas: los datos no se sincronizan entre dispositivos (para eso está exportar/importar).
+ * Si la persona ingresa a su cuenta, se sincroniza con ella (ver account.ts); si no, queda solo en este navegador.
  * Si el navegador no permite guardar, funciona igual mientras la pestaña esté abierta.
  */
 let state: WishState | null = null;
@@ -86,3 +86,10 @@ export function useWishlist() {
 }
 
 export type { WishList };
+
+/** Acceso directo al estado (para sincronizar con la cuenta) */
+export const wishStore = {
+  get,
+  set,
+  subscribe: (cb: () => void) => { listeners.add(cb); return () => { listeners.delete(cb); }; },
+};

@@ -4,8 +4,11 @@ import { Fragment, useEffect, useMemo, useRef, useState } from "react";
 import type { Game, SearchResponse } from "@/lib/types.ts";
 import { formatHint, parseDecklist, type DeckEntry, type DeckError } from "@/lib/decklist.ts";
 import { coverageByStore, matchEntry, type DeckCard } from "@/lib/deck.ts";
-import { cardKey, optimize, planText, type Plan } from "@/lib/optimizer.ts";
+import { cardKey, optimize, planText, type Plan, type StoreShipping } from "@/lib/optimizer.ts";
+import { applyPrefs, COND_LABEL, DEFAULT_PREFS, prefsActive, type DeckPrefs } from "@/lib/deckprefs.ts";
+import { usePersisted } from "./usePersisted.ts";
 import { idDeckToText, isYdk, isYdke, parseYdk, parseYdke } from "@/lib/deckimport.ts";
+import { isDeckUrl } from "@/lib/deckurl.ts";
 import { GAME_IDS, GAMES } from "@/lib/games.ts";
 import { STORES } from "@/lib/stores.ts";
 import { deckUrl } from "@/lib/share.ts";
@@ -25,6 +28,10 @@ const EXAMPLES = Object.fromEntries(GAME_IDS.map((g) => [g, GAMES[g].deckExample
 const RAR_ORDER = Object.fromEntries(GAME_IDS.map((g) => [g, GAMES[g].rarityOrder])) as Record<Game, string[]>;
 const STORE = new Map(STORES.map((s) => [s.id, s]));
 const MAX_FILE = 200_000;
+/** Envíos publicados por las tiendas (solo los verificados en lib/stores.ts); lo que cargue la persona los pisa */
+const CONFIG_SHIP: Record<string, StoreShipping> = Object.fromEntries(
+  STORES.filter((s) => typeof s.shipping?.cost === "number").map((s) => [s.id, { cost: s.shipping!.cost!, freeFrom: s.shipping!.freeFrom ?? null }])
+);
 
 type View = "plan" | "tiendas" | "cartas";
 type Strategy = "barata" | "menos" | "equilibrada" | "manual";
@@ -47,7 +54,7 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
   const [errors, setErrors] = useState<DeckError[]>([]);
   const [failed, setFailed] = useState<string[]>([]);
   const [pending, setPending] = useState<string[]>([]);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number; t0?: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [view, setView] = useState<View>("plan");
   const [strategy, setStrategy] = useState<Strategy>("barata");
@@ -63,6 +70,8 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
   const [onlyNear, setOnlyNear] = useState(false);
   const [edits, setEdits] = useState<Record<number, string>>({});
   const [copied, setCopied] = useState(false);
+  const [prefs, setPrefs] = usePersisted<DeckPrefs>("cazacartas:plan-prefs", DEFAULT_PREFS);
+  const [storeShip, setStoreShip] = usePersisted<Record<string, StoreShipping>>("cazacartas:envios", {});
   const started = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -88,6 +97,22 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
   async function run(source = text) {
     setNotice(null);
     let src = source;
+    // Link de un mazo (Archidekt, TappedOut, MTGGoldfish...): se trae la lista
+    if (isDeckUrl(src)) {
+      setNotice("Leyendo el mazo del link…");
+      try {
+        const r = await fetch(`/api/mazo?url=${encodeURIComponent(src.trim())}`);
+        const d = (await r.json()) as { text?: string; source?: string; game?: Game; error?: string; howTo?: string };
+        if (!r.ok || !d.text) { setNotice(`${d.error ?? "No se pudo leer el link."} ${d.howTo ?? ""}`); return; }
+        if (d.game && d.game !== game) { setNotice(`Ese mazo es de ${GAMES[d.game].short}: elegí ese juego arriba y volvé a pegar el link.`); return; }
+        src = d.text;
+        setText(d.text);
+        setNotice(`Importamos el mazo desde ${d.source}. Revisalo si querés y buscamos las cartas.`);
+      } catch {
+        setNotice("No se pudo leer el link. Exportá el mazo como texto y pegalo acá.");
+        return;
+      }
+    }
     if (game === "ygo" && (isYdk(src) || isYdke(src))) {
       const conv = await convertIds(src);
       if (!conv) return;
@@ -102,10 +127,11 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
     setFailed([]);
     if (!parsed.entries.length) return;
 
-    // Una búsqueda por nombre distinto, de a 3 a la vez; las repetidas salen de la memoria (10 min)
+    // Una búsqueda por nombre distinto, de a 4 a la vez; las repetidas salen de la memoria (10 min)
     const names = [...new Set(parsed.entries.map((e) => e.name))];
     const results = new Map<string, SearchResponse | null>();
-    setProgress({ done: 0, total: names.length });
+    const t0 = Date.now();
+    setProgress({ done: 0, total: names.length, t0 });
     let done = 0;
     await searchMany(names, async (name) => {
       try {
@@ -113,8 +139,8 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
       } catch {
         results.set(name, null);
       }
-      setProgress({ done: ++done, total: names.length });
-    }, 2);
+      setProgress({ done: ++done, total: names.length, t0 });
+    }, 4);
 
     // Reintento: las cartas en las que alguna tienda tardó o se cortó se vuelven a buscar de a una,
     // con una pausa (el servidor solo vuelve a consultar las tiendas que fallaron)
@@ -164,7 +190,9 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
     setNotice(`Cargamos ${file.name}. Revisalo y tocá Buscar.`);
   }
 
-  const valid = useMemo(() => (cards ?? []).filter((c) => !c.error), [cards]);
+  const allValid = useMemo(() => (cards ?? []).filter((c) => !c.error), [cards]);
+  // Opciones del plan (estado mínimo, idioma, impresión): filtran las publicaciones de cada carta
+  const { cards: valid, hidden } = useMemo(() => applyPrefs(allValid, prefs, game), [allValid, prefs, game]);
   const unknown = (cards ?? []).filter((c) => c.error);
   const totalCopies = valid.reduce((s, c) => s + c.entry.qty, 0);
 
@@ -176,8 +204,8 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
   }, [pickup, pickupNear, province]);
   const shipNum = shipping.trim() === "" ? null : Math.max(0, Number(shipping.replace(/\D/g, "")) || 0);
   const plans = useMemo(
-    () => (valid.length ? optimize(valid, { shippingPerStore: shipNum, pickup: pickupSet, overrides }) : null),
-    [valid, shipNum, pickupSet, overrides]
+    () => (valid.length ? optimize(valid, { shippingPerStore: shipNum, shipping: { ...CONFIG_SHIP, ...storeShip }, pickup: pickupSet, overrides }) : null),
+    [valid, shipNum, storeShip, pickupSet, overrides]
   );
   const plan: Plan | null = plans ? (strategy === "manual" ? plans.manual ?? plans.barata : plans[strategy]) : null;
 
@@ -240,7 +268,7 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
             {formatHint(game)}. La cantidad puede ir antes o después del nombre (3, x3, 3x, -3).
             {game === "ygo" && " También acepta archivos .ydk y links ydke://."}
             {game === "pkm" && " Acepta el formato de Pokémon TCG Live."}
-            {game === "mtg" && " Acepta el formato de Arena / Moxfield."}
+            {game === "mtg" && " Acepta el formato de Arena / Moxfield, o pegá el link de un mazo de Archidekt, TappedOut o MTGGoldfish."}
           </span>
         </div>
         <div className="search">
@@ -250,7 +278,7 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
           <button className="btn btn-ghost" type="button" onClick={() => fileRef.current?.click()}>Subir archivo</button>
           <input ref={fileRef} type="file" accept=".txt,.ydk,.dek,.dck,.csv,text/plain" hidden onChange={(e) => { onFile(e.target.files?.[0]); e.target.value = ""; }} />
           <button className="btn btn-ghost" type="button" onClick={() => setText(EXAMPLES[game])}>Usar lista de ejemplo</button>
-          {progress && <span className="slow-note">Puede demorar unos segundos de más: buscamos cada carta en todas las tiendas.</span>}
+          {progress && <span className="slow-note">{etaText(progress) ?? "Puede demorar unos segundos de más: buscamos cada carta en todas las tiendas."}</span>}
         </div>
         {progress && (
           <div className="bar" role="progressbar" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.done}>
@@ -313,7 +341,39 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
                 <div className="field">
                   <label htmlFor="ship">Envío estimado por tienda (opcional)</label>
                   <input id="ship" inputMode="numeric" placeholder="Ej: 6000" value={shipping} onChange={(e) => setShipping(e.target.value.replace(/[^\d]/g, "").slice(0, 7))} />
-                  <span className="hint">Lo ponés vos: cada tienda cobra distinto según tu ciudad. Sin este dato, los envíos quedan “sin datos” y no se suman.</span>
+                  <span className="hint">Lo ponés vos: cada tienda cobra distinto según tu ciudad. Sin este dato, los envíos quedan “sin datos” y no se suman. En cada tienda de abajo podés cargar su envío exacto y desde qué monto envía gratis.</span>
+                </div>
+                <div className="field prefs">
+                  <span className="lbl">Opciones del plan</span>
+                  <div className="prefs-row">
+                    <label>Estado
+                      <select value={prefs.minCond} onChange={(e) => setPrefs({ ...prefs, minCond: e.target.value as DeckPrefs["minCond"] })}>
+                        {(Object.keys(COND_LABEL) as DeckPrefs["minCond"][]).map((k) => <option key={k} value={k}>{COND_LABEL[k]}</option>)}
+                      </select>
+                    </label>
+                    <label>Idioma
+                      <select value={prefs.lang} onChange={(e) => setPrefs({ ...prefs, lang: e.target.value as DeckPrefs["lang"] })}>
+                        <option value="any">Cualquiera</option>
+                        <option value="Inglés">Inglés</option>
+                        <option value="Español">Español</option>
+                        <option value="Japonés">Japonés</option>
+                      </select>
+                    </label>
+                    <label>Impresión
+                      <select value={prefs.printing} onChange={(e) => setPrefs({ ...prefs, printing: e.target.value as DeckPrefs["printing"] })}>
+                        <option value="any">Cualquiera</option>
+                        <option value="exact">Solo la que pide la lista</option>
+                      </select>
+                    </label>
+                  </div>
+                  <label className="check">
+                    <input type="checkbox" checked={prefs.noSpecial} onChange={(e) => setPrefs({ ...prefs, noSpecial: e.target.checked })} />
+                    Sin versiones especiales (Alter, Foil, Parallel…)
+                  </label>
+                  <span className="hint">
+                    {prefsActive(prefs) ? `${hidden} publicaci${hidden === 1 ? "ón quedó" : "ones quedaron"} afuera por estas opciones. ` : ""}
+                    Las publicaciones que no dicen el estado o el idioma se incluyen (la mayoría vende NM en inglés). “Solo la que pide la lista” usa el código o el set de cada línea, si lo tiene.
+                  </span>
                 </div>
                 <div className="field">
                   <label htmlFor="deck-prov2">Tu provincia</label>
@@ -366,9 +426,13 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
                         <div className="from">
                           <small>{s.items.reduce((n, i) => n + i.qty, 0)} copias</small>
                           <b>{fmt.format(s.subtotal)}</b>
-                          <small>{s.pickup ? "Retiro en local: envío $0" : s.shipping !== null ? `+ envío est. ${fmt.format(s.shipping)}` : "+ envío sin datos"}</small>
+                          <small>{s.pickup ? "Retiro en local: envío $0" : s.shipping === 0 ? "Envío gratis" : s.shipping !== null ? `+ envío est. ${fmt.format(s.shipping)}` : "+ envío sin datos"}</small>
                         </div>
                       </div>
+                      {!s.pickup && s.freeFrom && s.subtotal < s.freeFrom && (
+                        <p className="hint">Envío gratis desde {fmt.format(s.freeFrom)}: te faltan {fmt.format(s.freeFrom - s.subtotal)}.</p>
+                      )}
+                      {!s.pickup && <ShipEditor value={storeShip[s.storeId]} onChange={(v) => { const n = { ...storeShip }; if (v) n[s.storeId] = v; else delete n[s.storeId]; setStoreShip(n); }} />}
                       {st?.hasLocal && !(pickupNear && sameArea(province, st.province)) && (
                         <label className="check">
                           <input type="checkbox" checked={pickup.has(s.storeId)} onChange={(e) => { const n = new Set(pickup); if (e.target.checked) n.add(s.storeId); else n.delete(s.storeId); setPickup(n); }} />
@@ -535,5 +599,32 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
         </>
       )}
     </section>
+  );
+}
+
+/** "Faltan ~40 s": se calcula con lo que vienen tardando las cartas ya buscadas */
+function etaText(p: { done: number; total: number; t0?: number }): string | null {
+  if (!p.t0 || p.done < 2 || p.done >= p.total) return null;
+  const left = ((Date.now() - p.t0) / p.done) * (p.total - p.done) / 1000;
+  return left < 60 ? `Faltan unos ${Math.max(5, Math.round(left / 5) * 5)} segundos` : `Faltan unos ${Math.round(left / 60)} minuto${Math.round(left / 60) === 1 ? "" : "s"}`;
+}
+
+/** Envío de una tienda: costo y monto desde el que envía gratis (lo carga la persona; se guarda en su navegador) */
+function ShipEditor({ value, onChange }: { value?: StoreShipping; onChange: (v: StoreShipping | null) => void }) {
+  const num = (t: string) => (t.replace(/\D/g, "") === "" ? null : Math.min(9_999_999, Number(t.replace(/\D/g, ""))));
+  const update = (cost: number | null, freeFrom: number | null) => onChange(cost === null && freeFrom === null ? null : { cost: cost ?? 0, freeFrom });
+  return (
+    <details className="ship-edit">
+      <summary>{value ? `Envío cargado: ${value.cost ? fmt.format(value.cost) : "$ 0"}${value.freeFrom ? ` · gratis desde ${fmt.format(value.freeFrom)}` : ""}` : "Cargar el envío de esta tienda"}</summary>
+      <div className="prefs-row">
+        <label>Costo de envío
+          <input inputMode="numeric" placeholder="Ej: 5000" value={value?.cost ? String(value.cost) : ""} onChange={(e) => update(num(e.target.value), value?.freeFrom ?? null)} />
+        </label>
+        <label>Gratis desde
+          <input inputMode="numeric" placeholder="Ej: 50000" value={value?.freeFrom ? String(value.freeFrom) : ""} onChange={(e) => update(value?.cost ?? null, num(e.target.value))} />
+        </label>
+      </div>
+      <span className="hint">Mirá el costo en la web de la tienda (o preguntales). Se guarda en este navegador para la próxima vez.</span>
+    </details>
   );
 }

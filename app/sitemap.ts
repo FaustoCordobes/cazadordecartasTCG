@@ -13,6 +13,9 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...GAME_IDS.map((g) => ({ url: `${BRAND.url}/${GAMES[g].param}`, lastModified: now, changeFrequency: "daily" as const, priority: 0.8 })),
     { url: `${BRAND.url}/tiendas`, lastModified: now, changeFrequency: "weekly", priority: 0.6 },
     { url: `${BRAND.url}/guia`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BRAND.url}/ofertas`, lastModified: now, changeFrequency: "daily", priority: 0.7 },
+    { url: `${BRAND.url}/vender`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: `${BRAND.url}/sumar-tienda`, lastModified: now, changeFrequency: "monthly", priority: 0.4 },
   ];
   const cards: MetadataRoute.Sitemap = [];
   for (const g of GAME_IDS) {

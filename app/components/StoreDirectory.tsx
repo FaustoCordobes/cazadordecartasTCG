@@ -103,7 +103,7 @@ export function StoreDirectory({ game, q, onReport, startAll }: { game: Game; q?
         )}
       </div>
       <p className="translated">
-        Tiendas de Argentina con cartas sueltas{filter !== "todos" ? ` de ${GAMES[filter].short}` : ""}: <b>{c.total}</b> en total ·
+        ¿Tenés una tienda? <a href="/sumar-tienda">Sumala gratis</a>. Tiendas de Argentina con cartas sueltas{filter !== "todos" ? ` de ${GAMES[filter].short}` : ""}: <b>{c.total}</b> en total ·
         <b> {c.auto}</b> con búsqueda integrada (aparecen en los resultados) · <b>{c.manual}</b> con búsqueda manual (el botón abre su web
         {query ? <> con “{query}” ya escrito cuando se puede</> : null}). Directorio revisado el {new Date(DIRECTORY_REVIEWED + "T12:00:00").toLocaleDateString("es-AR")}.
       </p>
