@@ -20,6 +20,10 @@ export interface DeckOffer {
   url: string;
   /** la tienda no publica el código: se tomó por nombre + expansión */
   codeUnverified?: boolean;
+  /** estado (NM, LP...), idioma y expansión según la publicación; null = la tienda no lo dice */
+  condition?: string | null;
+  lang?: string | null;
+  set?: string | null;
 }
 
 export interface DeckCard {
@@ -93,6 +97,9 @@ export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): D
         stockKnown: typeof l.stock === "number" && l.stock > 0,
         url: l.url,
         codeUnverified: loose.has(g.key) || (byCode && !l.code && !!g.code) || undefined,
+        condition: l.condition ?? null,
+        lang: l.lang ?? g.lang ?? null,
+        set: l.set ?? g.setName ?? null,
       });
     }
   }

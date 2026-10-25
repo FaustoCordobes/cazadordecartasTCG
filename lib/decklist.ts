@@ -13,6 +13,8 @@ export interface DeckEntry {
   qty: number;
   name: string;
   code: string | null;
+  /** Magic: código del set ("CMM") si la lista lo trae; sirve para pedir esa impresión */
+  set?: string | null;
   /** número de línea (1 = primera) */
   line: number;
   raw: string;
@@ -41,16 +43,16 @@ const HEADERS = /^(main( deck)?|extra( deck)?|side( deck)?|deck|digi-?eggs?|eggs
 // Encabezados de Pokémon TCG Live, Magic (Arena/Moxfield) y One Piece: "Pokémon: 12", "Trainer (30)", "Commander"
 const HEADERS2 = /^(pok[eé]mon|trainers?|entrenador(es)?|energ(y|ies|[ií]as?)|total cards|commander|comandante|companion|compa[nñ]ero|maybeboard|leaders?|l[ií]der(es)?|characters?|personajes?|events?|eventos?|stages?|escenarios?|lands?|tierras?|creatures?|criaturas?|instants?|sorceries|artifacts?|enchantments?|planeswalkers?)\s*[:(]?\s*\d*\s*\)?\s*:?$/i;
 
-const DIGI_CODE = /\b((?:BT|EX|ST|AD|RB|LM|BO|P)\d{0,2}-\d{2,3})\b/i;
+const DIGI_CODE = /\b((?:(?:BT|EX|ST|AD|RB|BO)\d{1,2}|LM\d{0,2}|P)-\d{2,3})\b/i;
 const OP_CODE = /\b((?:OP|ST|EB|PRB)\d{2}-\d{3}|P-\d{3})\b/i;
-// Magic Arena/Moxfield: "Sol Ring (CMM) 395 *F*" → el set y el número se ignoran
+// Magic Arena/Moxfield: "Sol Ring (CMM) 395 *F*" → se guarda el set (para "solo esa impresión")
 const MTG_TAIL = /\s*\(([A-Z0-9]{2,6})\)\s*([\w★-]+)?\s*(\*[A-Z]+\*)?\s*$/i;
 // Pokémon TCG Live: "Charizard ex OBF 125", "Pikachu PR-SV 27"
 const PKM_TAIL = /\s+([A-Z]{2,4}(?:-[A-Z]{2,3})?)\s+([A-Z]{0,3}\d{1,3}[a-z]?)\s*$/;
 const YGO_CODE = /\b([A-Z0-9]{3,5}-(?:EN|SP|JP|DE|FR|IT|PT|KR)?[A-Z]?\d{2,3})\b/;
 
-function extractCode(game: Game, text: string): { code: string | null; rest: string } {
-  if (game === "mtg") return { code: null, rest: text.replace(MTG_TAIL, "") };
+function extractCode(game: Game, text: string): { code: string | null; rest: string; set?: string | null } {
+  if (game === "mtg") return { code: null, rest: text.replace(MTG_TAIL, ""), set: text.match(MTG_TAIL)?.[1]?.toUpperCase() ?? null };
   if (game === "pkm") return { code: null, rest: text.replace(PKM_TAIL, "") };
   const re = game === "digi" ? DIGI_CODE : game === "op" ? OP_CODE : YGO_CODE;
   const m = text.match(re);
@@ -96,7 +98,7 @@ export function parseDecklist(text: string, game: Game): ParsedDeck {
     if (HEADERS.test(t) || HEADERS2.test(t)) return;
 
     // El código puede estar pegado a la cantidad ("BT25-034 x4"): primero se separa el código
-    const { code, rest: withoutCode } = extractCode(game, t);
+    const { code, rest: withoutCode, set } = extractCode(game, t);
     const { qty, rest } = extractQty(clean(withoutCode));
     const name = clean(rest.replace(/[[\]()]/g, " "));
 
@@ -112,7 +114,7 @@ export function parseDecklist(text: string, game: Game): ParsedDeck {
       errors.push({ line, raw, reason: "No encontramos el nombre de la carta. " + formatHint(game) });
       return;
     }
-    entries.push({ qty, name, code, line, raw });
+    entries.push({ qty, name, code, line, raw, ...(set ? { set } : {}) });
   });
 
   // Une líneas repetidas de la misma carta

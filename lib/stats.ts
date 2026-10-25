@@ -1,6 +1,8 @@
 import type { Game, SearchResponse } from "./types.ts";
 import { supabase } from "./supa.ts";
 import { norm } from "./parse.ts";
+import { getDolar } from "./dolar.ts";
+import { offerRows, saveOffers } from "./market.ts";
 
 /**
  * Historial de precios y analítica sin cookies, guardados en Supabase.
@@ -46,6 +48,8 @@ export async function recordSearch(res: SearchResponse) {
       body: JSON.stringify({ p_game: res.game, p_consulta: searchLabel(res), p_sin: res.cards.length === 0 }),
       timeoutMs: 2500,
     }),
+    // Ofertas: lo que esta búsqueda encontró bien por debajo de la referencia de TCGplayer
+    getDolar().then((d) => saveOffers(offerRows(res, d))),
   ]);
 }
 

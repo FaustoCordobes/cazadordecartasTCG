@@ -34,6 +34,10 @@ export interface StoreConfig {
   wooCategory?: Partial<Record<Game, string>>;
   /** Dirección del local, si la tienda la publica */
   address?: string;
+  /** Envío publicado por la tienda (solo datos verificados, con fecha): costo y monto desde el que es gratis */
+  shipping?: { cost?: number; freeFrom?: number; note?: string; checked: string };
+  /** La tienda compra cartas (buylist): link o WhatsApp que la tienda publica o nos pasó */
+  buylist?: { url?: string; whatsapp?: string; note?: string; checked: string };
 }
 
 /** Lo que devuelve un adaptador, tal cual sale de la tienda */

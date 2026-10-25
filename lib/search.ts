@@ -248,7 +248,8 @@ export async function searchAll(game: Game, q: string, onProgress?: (p: SearchPr
         statuses.push({
           ...base,
           error:
-            platform === "sin-conexion" ? "No se pudo conectar con la tienda"
+            // (no es "pasajero": reintentar enseguida no sirve, se vuelve a probar en 15 minutos)
+            platform === "sin-conexion" ? "Su web no responde (puede estar caída)"
             : platform === "desconocida" ? "No se pudo reconocer su tienda online"
             : `Su plataforma (${platform}) todavía no tiene adaptador`,
         });

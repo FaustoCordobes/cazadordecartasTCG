@@ -1,7 +1,7 @@
 # Pendientes, riesgos y propuestas (23/10/2026)
 
 ## Lo que quedó fuera a propósito
-- **Cuentas de usuario y sincronización entre dispositivos**: pedido explícito de no hacerlo por ahora. Mi lista usa el navegador + exportar/importar.
+- **Cuentas**: hechas (v13) con mail y contraseña, sin confirmación. Pendiente: verificación opcional del mail más adelante, ingreso con Google, y CAPTCHA si aparecen cuentas de bots.
 - **Avisos con la app cerrada (email, push, Telegram)**: necesitan cuentas o suscripciones con doble opt-in y un proceso programado. Hoy las alertas se revisan al tocar "Actualizar precios". Propuesta: Web Push (gratis, sin email) + cron diario en GitHub Actions que revise solo las cartas con alerta, guardando la suscripción en Supabase con link de baja.
 - **Panel para tiendas / feed oficial de stock**: propuesta más simple → una tienda nos manda la URL de un CSV o de su feed de Google Merchant (columnas: título, precio, stock, url, juego) y el indexador lo lee una vez por día como una plataforma más (`platform: "feed"`). Se suma sin login: la tienda pide el alta por el formulario. No se implementó todavía porque ninguna tienda lo pidió.
 - **Newsletter / canal**, **testimonios**, **calendario de torneos**, **"busco esta carta"**: dependen de comunidad y moderación; no hay datos reales todavía.

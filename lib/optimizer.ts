@@ -10,13 +10,26 @@ import type { DeckCard, DeckOffer } from "./deck.ts";
  *  C. Equilibrado: la menor cantidad de tiendas pagando como mucho un 10 % más que la opción A.
  * Además, la persona puede elegir a mano en qué tienda comprar cada carta ("Personalizado").
  *
- * Envíos: nunca se inventan. Solo se suman si la persona carga un envío estimado por tienda, o si elige
- * retirar en el local (envío $0). El resto se informa como "envío sin datos".
+ * Envíos: nunca se inventan. Solo se suman si la persona carga un envío estimado (general o de cada tienda,
+ * con el monto desde el que esa tienda envía gratis), o si elige retirar en el local (envío $0).
+ * El resto se informa como "envío sin datos".
  */
+
+/** Envío de una tienda: costo y, si tiene, monto de compra desde el que es gratis */
+export interface StoreShipping { cost: number; freeFrom?: number | null }
+
+/** Envío que corresponde a una tienda según lo que se le compra */
+export function shippingFor(subtotal: number, s: StoreShipping | null | undefined, fallback: number | null): number | null {
+  if (!s) return fallback;
+  if (s.freeFrom && subtotal >= s.freeFrom) return 0;
+  return s.cost;
+}
 
 export interface OptimizerOptions {
   /** envío estimado por tienda que cargó la persona; null = no se sabe */
   shippingPerStore: number | null;
+  /** envío de cada tienda (lo carga la persona); pisa al general */
+  shipping?: Record<string, StoreShipping>;
   /** tiendas donde la persona retira en el local (envío $0) */
   pickup?: Set<string>;
   /** clave de carta → tienda elegida a mano */
@@ -33,6 +46,8 @@ export interface PlanStore {
   /** null = envío sin datos */
   shipping: number | null;
   pickup: boolean;
+  /** la tienda envía gratis desde ese monto (si se cargó) */
+  freeFrom?: number | null;
 }
 export interface Plan {
   id: "barata" | "menos" | "equilibrada" | "manual";
@@ -84,7 +99,7 @@ function summarize(lines: PlanLine[], opts: OptimizerOptions, id: Plan["id"]): P
       const pickup = !!opts.pickup?.has(b.storeId);
       const s = byStore.get(b.storeId) ?? {
         storeId: b.storeId, storeName: b.storeName, items: [], subtotal: 0, pickup,
-        shipping: pickup ? 0 : opts.shippingPerStore,
+        shipping: null, freeFrom: opts.shipping?.[b.storeId]?.freeFrom ?? null,
       };
       s.items.push({ name: l.name, code: l.code, qty: b.qty, price: b.price, url: b.url, version: b.version, codeUnverified: b.codeUnverified });
       s.subtotal += b.qty * b.price;
@@ -92,6 +107,7 @@ function summarize(lines: PlanLine[], opts: OptimizerOptions, id: Plan["id"]): P
     }
   }
   const stores = [...byStore.values()].sort((a, b) => b.subtotal - a.subtotal);
+  for (const st of stores) st.shipping = st.pickup ? 0 : shippingFor(st.subtotal, opts.shipping?.[st.storeId], opts.shippingPerStore);
   const shippingKnown = stores.reduce((s, x) => s + (x.shipping ?? 0), 0);
   const unknownShipping = stores.filter((x) => x.shipping === null).length;
   return { id, lines, stores, cardsTotal, shippingKnown, unknownShipping, total: cardsTotal + shippingKnown, copies, missingCopies, unconfirmedStock };
@@ -180,7 +196,7 @@ const fmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS",
 export function planText(p: Plan, title: string): string {
   const out = [`🛒 *${title}* — armado con Cazacartas`, ""];
   for (const s of p.stores) {
-    out.push(`*${s.storeName}* — ${fmt.format(s.subtotal)}${s.pickup ? " (retiro en local)" : s.shipping !== null ? ` + envío est. ${fmt.format(s.shipping)}` : " + envío sin datos"}`);
+    out.push(`*${s.storeName}* — ${fmt.format(s.subtotal)}${s.pickup ? " (retiro en local)" : s.shipping === 0 ? " + envío gratis" : s.shipping !== null ? ` + envío est. ${fmt.format(s.shipping)}` : " + envío sin datos"}`);
     for (const it of s.items) out.push(`• ${it.qty} × ${it.name}${it.code ? ` ${it.code}` : ""}${it.version ? ` (${it.version})` : ""} a ${fmt.format(it.price)} — ${it.url}`);
     out.push("");
   }

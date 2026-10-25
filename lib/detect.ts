@@ -6,6 +6,9 @@ import { robotsAllows } from "./robots.ts";
 export type Detected = Exclude<Platform, "auto"> | "empretienda" | "desconocida" | "sin-conexion";
 
 const cache = new TTLCache<Detected>(24 * 60 * 60 * 1000);
+/** Tiendas cuya web no respondió: no se vuelven a intentar por 15 minutos (antes cada carta de un
+ *  listado esperaba hasta ~17 s por cada tienda caída) */
+const down = new TTLCache<true>(15 * 60 * 1000);
 
 /** Reconoce la plataforma por huellas típicas del HTML de la home */
 export function detectFromHtml(html: string): Detected {
@@ -22,11 +25,13 @@ export async function detectPlatform(store: StoreConfig): Promise<Detected> {
   if (store.platform !== "auto") return store.platform;
   const hit = cache.get(store.id);
   if (hit) return hit;
+  if (down.get(store.id)) return "sin-conexion";
   let d: Detected = "desconocida";
   try {
     if (await robotsAllows(store.base, "/")) d = detectFromHtml(await getText(store.base + "/"));
   } catch {
-    // sin conexión: no se cachea, se reintenta en la próxima búsqueda
+    // sin conexión: se recuerda 15 minutos y después se reintenta
+    down.set(store.id, true);
     return "sin-conexion";
   }
   cache.set(store.id, d);

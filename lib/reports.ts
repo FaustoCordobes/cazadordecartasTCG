@@ -6,6 +6,7 @@ export const REPORT_TYPES = {
   variante: "La versión o rareza es incorrecta",
   otra_carta: "La publicación es de otra carta",
   tienda_nueva: "Sugerir una tienda nueva",
+  tienda_alta: "Soy de una tienda y quiero sumarla",
   tienda_dato: "Corregir un dato de una tienda",
   tienda_cerrada: "La tienda cerró o cambió de web",
   tienda_baja: "Soy de la tienda y quiero que la saquen",
@@ -35,8 +36,8 @@ export function validateReport(body: unknown): Report | string {
   if (url && !/^https?:\/\//i.test(url)) return "El link tiene que empezar con http";
   const email = clip(b.email, 120);
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return "El email no parece válido";
-  const comentario = clip(b.comentario, 600);
-  if ((b.tipo === "contacto" || b.tipo === "tienda_nueva") && !comentario && !url) return "Contanos un poco más";
+  const comentario = clip(b.comentario, b.tipo === "tienda_alta" ? 2000 : 600);
+  if ((b.tipo === "contacto" || b.tipo === "tienda_nueva" || b.tipo === "tienda_alta") && !comentario && !url) return "Contanos un poco más";
   return {
     tipo: b.tipo as ReportType,
     game: clip(b.game, 10),
