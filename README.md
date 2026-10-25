@@ -31,7 +31,7 @@ Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **O
 - Respeta el stock, avisa las copias con stock sin confirmar y las que no tiene nadie. "Mejor resultado entre las tiendas consultadas", nunca "el mínimo del país".
 - Copiar / mandar el plan por WhatsApp, pasarlo a Mi lista y compartir el listado por link.
 
-**Mi lista** (sin cuenta, en el navegador)
+**Mi lista** (en el navegador, o en tu cuenta si ingresaste)
 - Varias listas con nombre, copias y **conseguidas**, cuánto falta.
 - **Alertas** "avisame si baja de $X" y "si vuelve el stock": se revisan al tocar *Actualizar precios* (no hay avisos con la app cerrada).
 - Cambio de precio desde que la guardaste, optimizar la compra de lo que falta, exportar/importar `.json`, compartir por WhatsApp.
@@ -40,6 +40,32 @@ Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **O
 - *Búsqueda integrada* vs. *Búsqueda manual* vs. *Integración no disponible*, contadores derivados de los datos, fecha de revisión, formulario para **sugerir, corregir o pedir la baja** de una tienda.
 
 **Otros**: modo oscuro, PWA instalable, páginas por juego (`/magic`, `/pokemon`…), por carta (`/carta/magic/Sol%20Ring`), guía para principiantes (`/guia`), panel `/estado` de cada tienda indexada, sitemap y robots, analítica sin cookies, formulario de contacto.
+
+## Novedades (v12)
+
+- **Envío por tienda** en el plan de compra: costo y monto desde el que envía gratis (lo carga la persona y se guarda
+  en su navegador; también se puede poner el dato verificado en `shipping` de `lib/stores.ts`). El optimizador lo tiene en cuenta.
+- **Opciones del plan**: estado mínimo (NM, LP…), idioma, "solo la impresión que pide la lista" y sin versiones especiales (`lib/deckprefs.ts`).
+- **Importar un mazo con su link** (Archidekt, TappedOut, MTGGoldfish), respetando su robots.txt (`/api/mazo`, `lib/deckurl.ts`).
+  Para Moxfield, YGOPRODeck, Limitless y otros se explica cómo exportar la lista.
+- **Ofertas y subas/bajas de la semana** en `/ofertas` (`lib/market.ts`): publicaciones 20 % o más por debajo de la referencia
+  de TCGplayer, y cambios de precio desde el historial. Necesita la migración `supabase/migrations/003_mercado_y_avisos.sql`.
+- **Avisos al celular** (notificaciones push, sin cuenta) para las alertas de "Mi lista". Los revisa `npm run avisos`
+  una vez por día en GitHub Actions. Necesita la migración 003 y las claves VAPID (ver `.env.example`).
+- **Buscar con una foto**: lee el código impreso de la carta con OCR en el navegador (Tesseract; la foto no se sube).
+- **Sumá tu tienda** (`/sumar-tienda`) y **Vender tus cartas** (`/vender`): cuánto se venden hoy y la referencia, y tiendas que compran
+  (campo `buylist` de `lib/stores.ts`, solo con datos confirmados por la tienda).
+
+## Cuentas (v13)
+
+- Crear cuenta con mail y contraseña **sin confirmar el mail** (Supabase Auth con "Confirm email" desactivado), ingresar,
+  "Mantener la sesión iniciada" (localStorage) o solo hasta cerrar el navegador (sessionStorage), recuperar contraseña por mail,
+  cerrar sesión y borrar la cuenta (`/api/cuenta`).
+- Lo que se guarda en la cuenta: todas las listas de "Mi lista" (con alertas) y los ajustes (opciones del plan, envíos por tienda,
+  provincia). Al ingresar desde otro dispositivo se juntan sin duplicar (`lib/accountsync.ts`).
+- Necesita la migración `supabase/migrations/004_cuentas.sql` (tabla `cuentas_datos` con Row Level Security: cada persona
+  ve solo su fila) y las variables `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. Sin ellas, el botón
+  "Cuenta" no aparece y la app funciona igual que antes.
 
 ## Cómo correrlo
 
