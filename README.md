@@ -2,7 +2,7 @@
 
 Escribís una carta de **Yu-Gi-Oh!**, **Digimon**, **Magic**, **Pokémon** u **One Piece** y la app la busca en tiendas TCG de Argentina: en qué tienda está, a qué precio, si hay stock, de cuándo es el dato y dónde queda el local, con link directo a la publicación.
 
-> **Gratis y sin comisiones.** Cazacartas no vende cartas, no cobra comisiones y ninguna tienda paga por aparecer ni por salir primera. Solo muestra dónde está cada carta y lleva al usuario a la tienda para que le compre directamente. Lee solo información pública, respeta robots.txt (incluido el Crawl-delay), se identifica con su propio User-Agent y hace pausas entre consultas. Si una tienda prefiere no aparecer, se la saca a pedido (WhatsApp 2944 24-2906). Las donaciones (alias `faust08`) son voluntarias y se usan solo para mantener el servidor; no cambian los resultados.
+> **Gratis y sin comisiones.** Cazacartas no vende cartas, no cobra comisiones y ninguna tienda paga por aparecer ni por salir primera. Solo muestra dónde está cada carta y lleva al usuario a la tienda para que le compre directamente. Lee solo información pública, respeta robots.txt (incluido el Crawl-delay), se identifica con su propio User-Agent y hace pausas entre consultas. Si una tienda prefiere no aparecer, se la saca a pedido (WhatsApp 2944 24-2906). Las donaciones (por Cafecito: cafecito.app/faust0cordobes) son voluntarias y se usan solo para mantener el servidor; no cambian los resultados.
 
 ## Qué hace
 
