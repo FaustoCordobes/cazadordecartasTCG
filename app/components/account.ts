@@ -21,6 +21,8 @@ const KEY_ = process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEX
 const REMEMBER = "cazacartas:recordar";
 
 export const accountsEnabled = !!(URL_ && KEY_);
+/** El botón "Continuar con Google" aparece solo si se configuró en Supabase (ver README) */
+export const googleEnabled = accountsEnabled && process.env.NEXT_PUBLIC_GOOGLE_LOGIN === "1";
 
 const safe = <T,>(fn: () => T, fallback: T): T => { try { return fn(); } catch { return fallback; } };
 const remember = () => safe(() => localStorage.getItem(REMEMBER) !== "0", true);
@@ -153,6 +155,12 @@ export const account = {
     const c = await sb();
     if (!c) return "Las cuentas no están activadas.";
     return run(() => c.auth.signInWithPassword({ email: email.trim(), password }));
+  },
+  /** Entrar con Google (si está activado en Supabase y NEXT_PUBLIC_GOOGLE_LOGIN=1). Vuelve a /cuenta. */
+  async signInWithGoogle() {
+    const c = await sb();
+    if (!c) return "Las cuentas no están activadas.";
+    return run(() => c.auth.signInWithOAuth({ provider: "google", options: { redirectTo: `${location.origin}/cuenta` } }) as never);
   },
   async signOut() {
     const c = await sb();

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { account, accountsEnabled, useAccount } from "./account.ts";
+import { account, accountsEnabled, googleEnabled, useAccount } from "./account.ts";
 import { emailOk, passwordProblem } from "@/lib/accountsync.ts";
 import { agoText } from "@/lib/freshness.ts";
 
@@ -113,6 +113,14 @@ export function AccountPanel({ onDone }: { onDone?: () => void }) {
           <button type="button" role="tab" aria-selected={mode === "crear"} className={mode === "crear" ? "on" : ""} onClick={() => { setMode("crear"); setErr(null); }}>Crear cuenta</button>
           <button type="button" role="tab" aria-selected={mode === "ingresar"} className={mode === "ingresar" ? "on" : ""} onClick={() => { setMode("ingresar"); setErr(null); }}>Ingresar</button>
         </div>
+      )}
+      {googleEnabled && mode !== "olvide" && (
+        <>
+          <button type="button" className="btn btn-ghost google-btn" onClick={async () => { account.setRemember(keep); const r = await account.signInWithGoogle(); if (r) setErr(r); }}>
+            <span aria-hidden="true" className="g-logo">G</span> Continuar con Google
+          </button>
+          <p className="hint or-line">o con tu mail</p>
+        </>
       )}
       {mode === "crear" && <p className="hint">Es gratis y la cuenta queda lista al toque: no hay que confirmar el mail. Sirve para tener tu lista en todos tus dispositivos.</p>}
       {mode === "olvide" && <h3>Recuperar la contraseña</h3>}

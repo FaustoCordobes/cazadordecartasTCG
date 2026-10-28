@@ -7,6 +7,7 @@ import { coverageByStore, matchEntry, type DeckCard } from "@/lib/deck.ts";
 import { cardKey, optimize, planText, type Plan, type StoreShipping } from "@/lib/optimizer.ts";
 import { applyPrefs, COND_LABEL, DEFAULT_PREFS, prefsActive, type DeckPrefs } from "@/lib/deckprefs.ts";
 import { usePersisted } from "./usePersisted.ts";
+import { useCurrency } from "./useCurrency.tsx";
 import { idDeckToText, isYdk, isYdke, parseYdk, parseYdke } from "@/lib/deckimport.ts";
 import { isDeckUrl } from "@/lib/deckurl.ts";
 import { GAME_IDS, GAMES } from "@/lib/games.ts";
@@ -72,6 +73,9 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
   const [copied, setCopied] = useState(false);
   const [prefs, setPrefs] = usePersisted<DeckPrefs>("cazacartas:plan-prefs", DEFAULT_PREFS);
   const [storeShip, setStoreShip] = usePersisted<Record<string, StoreShipping>>("cazacartas:envios", {});
+  const [cur] = useCurrency();
+  const [usdArs, setUsdArs] = useState<number | null>(null);
+  useEffect(() => { fetch("/api/dolar").then((r) => r.json()).then((d) => setUsdArs(d?.venta ?? null)).catch(() => {}); }, []);
   const started = useRef(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -315,6 +319,24 @@ export function Deck({ game, onAdded, initialText, autoRun, onReport }: {
             <div className="stat"><b>{plans.barata.missingCopies}</b><span>copias que ninguna tienda tiene</span></div>
             <div className="stat"><b>{fmt.format(plans.barata.total)}</b><span>mejor total entre las tiendas consultadas</span></div>
           </div>
+          {(() => {
+            // Referencia internacional del listado (como el "precio del mazo" de Moxfield o ScryPrice)
+            const withRef = allValid.filter((c) => c.refUsd);
+            if (!withRef.length || !usdArs) return null;
+            const usd = withRef.reduce((t, c) => t + c.refUsd! * c.entry.qty, 0);
+            const ars = Math.round(usd * usdArs);
+            const usdFmt = new Intl.NumberFormat("es-AR", { style: "currency", currency: "USD", maximumFractionDigits: 2 });
+            const full = withRef.length === allValid.length;
+            const diff = full && plans.barata.missingCopies === 0 ? Math.round(((plans.barata.cardsTotal - ars) / ars) * 100) : null;
+            return (
+              <p className="deck-ref">
+                🌎 <b>El mismo listado en TCGplayer (EE. UU.):</b> {cur === "USD" ? usdFmt.format(usd) : fmt.format(ars)}{" "}
+                <small>≈ {cur === "USD" ? fmt.format(ars) : usdFmt.format(usd)}</small>
+                {diff !== null && <> · comprarlo acá sale <b className={diff > 0 ? "mv-up" : "mv-down"}>{diff > 0 ? `${diff} % más caro` : diff < 0 ? `${-diff} % más barato` : "igual"}</b> (sin envíos)</>}
+                {!full && <small> · con {withRef.length} de {allValid.length} cartas (las demás no tienen precio internacional)</small>}
+              </p>
+            );
+          })()}
 
           <div className="res-tools">
             <p className="fresh-note">

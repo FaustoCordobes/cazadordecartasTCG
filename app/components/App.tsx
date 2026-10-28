@@ -14,6 +14,7 @@ import { ThemeToggle } from "./ThemeToggle.tsx";
 import { AccountButton } from "./AccountButton.tsx";
 import { CurrencyToggle, useCurrency } from "./useCurrency.tsx";
 import { PriceCompare } from "./PriceCompare.tsx";
+import { PriceCalculator } from "../calculadora/CalculadoraClient.tsx";
 import { InstallApp } from "./InstallApp.tsx";
 import { ShareLinks } from "./ShareLinks.tsx";
 import { ProvinceSelect, useProvince } from "./useProvince.tsx";
@@ -36,7 +37,7 @@ import { median, refUsd } from "@/lib/refprice.ts";
 import type { WishOffer } from "@/lib/wishlist.ts";
 import type { Dolar } from "@/lib/dolar.ts";
 
-type Tab = "carta" | "mazo" | "lista";
+type Tab = "carta" | "mazo" | "lista" | "precios";
 
 const STORE_PROVINCE = new Map(STORES.map((s) => [s.id, s.province]));
 const STORE_CASH = new Map(STORES.filter((s) => s.cashDiscount).map((s) => [s.id, s.cashDiscount!]));
@@ -204,6 +205,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
     if (sp.get("cerca") === "1") setOnlyNear(true);
     if (sp.get("exacta") === "1") setExactOnly(true);
     if (sp.get("vista") === "lista") setTab("lista");
+    if (sp.get("vista") === "precios") setTab("precios");
     if (window.location.hash === "#directorio") setDirOpen(true);
     if (p.deck) { setTab("mazo"); setDeckInit({ text: p.deck, auto: true }); }
     else if (p.card || initialQuery) search(p.card ?? initialQuery!, g, keep);
@@ -421,7 +423,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
             <button type="button" className="theme-btn" onClick={goList}><span aria-hidden="true">⭐</span><span>Mi lista{wish.count ? ` (${wish.count})` : ""}</span></button>
             <a className="theme-btn" href={`/ofertas?juego=${GAMES[game].param}`}><span aria-hidden="true">🔥</span><span>Ofertas</span></a>
             <a className="theme-btn" href="/tiendas"><span aria-hidden="true">🏪</span><span>Tiendas</span></a>
-            <a className="theme-btn" href="/calculadora"><span aria-hidden="true">🧮</span><span>Calculadora</span></a>
+            <button type="button" className="theme-btn" onClick={() => { setTab("precios"); document.getElementById("s2")?.scrollIntoView({ behavior: "smooth", block: "start" }); }}><span aria-hidden="true">🧮</span><span>Calculadora</span></button>
             <a className="theme-btn" href="/vender"><span aria-hidden="true">💱</span><span>Vender</span></a>
             <a className="theme-btn" href="/guia"><span aria-hidden="true">📘</span><span>Guía</span></a>
             <AccountButton />
@@ -430,6 +432,12 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
             <ThemeToggle />
           </nav>
         </header>
+        {usd && (
+          <p className="dolar-hoy" title={`Fuente: ${usd.fuente}, ${new Date(usd.fecha).toLocaleString("es-AR")}`}>
+            💵 {usd.nombre[0].toUpperCase() + usd.nombre.slice(1)} hoy: <b>{fmt.format(usd.venta)}</b>
+            <span> · se usa para pasar precios a dólares</span>
+          </p>
+        )}
         <AvisoCorto />
         {intro}
         <Onboarding />
@@ -454,10 +462,12 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
         </section>
 
         <section aria-labelledby="s2" className="group" id="s2wrap">
-          <div className="step"><b>2</b><h2 id="s2">{tab === "lista" ? "Mi lista" : tab === "mazo" ? "Listado de cartas / Decklist" : "Buscá la carta"}</h2></div>
+          <div className="step"><b>2</b><h2 id="s2">{tab === "lista" ? "Mi lista" : tab === "mazo" ? "Listado de cartas / Decklist" : tab === "precios" ? "Precios en dólares y pesos" : "Buscá la carta"}</h2></div>
           <ModeTabs tab={tab} setTab={setTab} count={wish.count} />
 
-          {tab === "lista" ? (
+          {tab === "precios" ? (
+            <PriceCalculator game={game} embedded />
+          ) : tab === "lista" ? (
             <Wishlist
               onSearch={() => setTab("carta")}
               onSearchAll={(text, g) => { if (g !== game) switchGame(g); setDeckInit({ text, auto: true }); setTab("mazo"); }}
@@ -900,6 +910,7 @@ function ModeTabs({ tab, setTab, count }: { tab: Tab; setTab: (t: Tab) => void; 
       <button role="tab" aria-selected={tab === "carta"} className={tab === "carta" ? "on" : ""} onClick={() => setTab("carta")}>🔎 Buscar<span className="lg">&nbsp;una carta</span></button>
       <button role="tab" aria-selected={tab === "mazo"} className={tab === "mazo" ? "on" : ""} onClick={() => setTab("mazo")}><span>📋<span className="lg"> Listado de cartas /</span> Decklist</span></button>
       <button role="tab" aria-selected={tab === "lista"} className={tab === "lista" ? "on" : ""} onClick={() => setTab("lista")}>⭐ Mi lista{count ? ` (${count})` : ""}</button>
+      <button role="tab" aria-selected={tab === "precios"} className={tab === "precios" ? "on" : ""} onClick={() => setTab("precios")}>💲 Precios<span className="lg">&nbsp;USD/ARS</span></button>
     </div>
   );
 }
