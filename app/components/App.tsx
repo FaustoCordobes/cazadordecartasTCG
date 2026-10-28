@@ -12,6 +12,8 @@ import { Donar } from "./Donar.tsx";
 import { QueEs } from "./QueEs.tsx";
 import { ThemeToggle } from "./ThemeToggle.tsx";
 import { AccountButton } from "./AccountButton.tsx";
+import { CurrencyToggle, useCurrency } from "./useCurrency.tsx";
+import { PriceCompare } from "./PriceCompare.tsx";
 import { InstallApp } from "./InstallApp.tsx";
 import { ShareLinks } from "./ShareLinks.tsx";
 import { ProvinceSelect, useProvince } from "./useProvince.tsx";
@@ -172,6 +174,10 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
   const [exactOnly, setExactOnly] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [hist, setHist] = useState<string | null>(null);
+  // Comparador de precios internacional: abierto en la primera carta exacta hasta que la persona toque algo
+  const [cmp, setCmp] = useState<Set<string>>(new Set());
+  const [cmpTouched, setCmpTouched] = useState(false);
+  const [cur] = useCurrency();
   const [province, setProvince] = useProvince();
   const [onlyNear, setOnlyNear] = useState(false);
   const [deckInit, setDeckInit] = useState<{ text: string; auto: boolean } | null>(null);
@@ -235,7 +241,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
     ctrl.current?.abort(); // cancela la búsqueda anterior si seguía en curso
     const c = new AbortController();
     ctrl.current = c;
-    setQ(term); setLoading(true); setError(null); setData(null); setPartial(null); setOpen(new Set()); setHist(null);
+    setQ(term); setLoading(true); setError(null); setData(null); setPartial(null); setOpen(new Set()); setHist(null); setCmp(new Set()); setCmpTouched(false);
     if (keepFilters) setF(keepFilters); else resetFilters();
     try {
       const res = await runSearch(g, term, { signal: c.signal, onProgress: (p) => !c.signal.aborted && setPartial((prev) => ({ ...p, cards: p.cards.length ? p.cards : prev?.cards ?? [] })) });
@@ -318,7 +324,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
       const conds = new Set(ls.map((x) => x.cond ?? "sin dato"));
       const copies = avail.reduce((t, x) => t + (typeof x.stock === "number" ? x.stock : 0), 0);
       return {
-        altName: c.altName, ref: refUsd(game, c), median: avail.length >= 3 ? median(avail.map((x) => x.price)) : null,
+        altName: c.altName, info: c.info, ref: refUsd(game, c), median: avail.length >= 3 ? median(avail.map((x) => x.price)) : null,
         copies, copiesKnown: avail.length > 0 && avail.every((x) => typeof x.stock === "number"),
         key, name: c.name, code: c.code, rarity: c.rarity, version: c.version, setName: c.setName, lang: c.lang ?? null, exact: !!c.exact, ls,
         min: Math.min(...(avail.length ? avail : ls).map((x) => x.price)), hasAvail: avail.length > 0, stores: new Set(ls.map((x) => x.storeId)).size,
@@ -393,6 +399,9 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
   const extraStores = LINK_STORES.filter((s) => s.games.includes(game));
   const shownQuery = data?.query ?? q;
   const usdOf = (ars: number) => (usd ? fmtUsd.format(ars / usd.venta) : null);
+  /** Precio en la moneda elegida (pesos o dólares) y el otro, chico al lado */
+  const money = (ars: number) => (cur === "USD" && usd ? fmtUsd.format(ars / usd.venta) : fmt.format(ars));
+  const moneyAlt = (ars: number) => (cur === "USD" && usd ? fmt.format(ars) : usdOf(ars));
 
   function goList() { setTab("lista"); document.getElementById("s2")?.scrollIntoView({ behavior: "smooth", block: "start" }); }
 
@@ -412,10 +421,12 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
             <button type="button" className="theme-btn" onClick={goList}><span aria-hidden="true">⭐</span><span>Mi lista{wish.count ? ` (${wish.count})` : ""}</span></button>
             <a className="theme-btn" href={`/ofertas?juego=${GAMES[game].param}`}><span aria-hidden="true">🔥</span><span>Ofertas</span></a>
             <a className="theme-btn" href="/tiendas"><span aria-hidden="true">🏪</span><span>Tiendas</span></a>
+            <a className="theme-btn" href="/calculadora"><span aria-hidden="true">🧮</span><span>Calculadora</span></a>
             <a className="theme-btn" href="/vender"><span aria-hidden="true">💱</span><span>Vender</span></a>
             <a className="theme-btn" href="/guia"><span aria-hidden="true">📘</span><span>Guía</span></a>
             <AccountButton />
             <InstallApp />
+            <CurrencyToggle />
             <ThemeToggle />
           </nav>
         </header>
@@ -645,7 +656,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                   )}
                 </div>
               )}
-              {rows.map((r) => {
+              {rows.map((r, rIdx) => {
                 const first = r.ls[0];
                 const [c1, c2, light] = thumbColors(first);
                 const isOpen = open.has(r.key);
@@ -656,6 +667,7 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                   ? [first.tipo && first.sub ? `${first.tipo} ${first.sub.toLowerCase()}${first.extra ? " · " + first.extra.toLowerCase() : ""}` : first.tipo, first.attr, first.lvl, first.race]
                   : [[...new Set(r.ls.flatMap((x) => x.color ?? []))].join(" / "), first.tipo, [[...new Set(r.ls.map((x) => x.lvl).filter(Boolean))].join(", "), first.forma, first.sub, first.extra].filter(Boolean).join(" · "), [...new Set(r.ls.map((x) => x.attr).filter(Boolean))].join(" / ")];
                 const exactVs = data ? norm(data.q) : "";
+                const cmpOpen = cmpTouched ? cmp.has(r.key) : rIdx === 0 && r.exact;
                 return (
                   <article className="card" key={r.key} aria-label={`${r.name} ${r.code ?? ""}`}>
                     <div className={`thumb${light ? " light" : ""}`} style={{ ["--c1" as string]: c1, ["--c2" as string]: c2 }} aria-hidden="true">
@@ -679,8 +691,8 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                         </div>
                         <div className="from">
                           <small>{r.hasAvail ? "Desde" : "Último precio visto"}</small>
-                          <b>{fmt.format(r.min)}</b>
-                          {usdOf(r.min) && <small className="usd" title={`Referencia: ${usd!.nombre} del ${new Date(usd!.fecha).toLocaleDateString("es-AR")}`}>≈ {usdOf(r.min)}</small>}
+                          <b>{money(r.min)}</b>
+                          {moneyAlt(r.min) && <small className="usd" title={usd ? `Referencia: ${usd.nombre} del ${new Date(usd.fecha).toLocaleDateString("es-AR")}` : undefined}>≈ {moneyAlt(r.min)}</small>}
                           <small>{r.ls.length} publicaci{r.ls.length === 1 ? "ón" : "ones"} en {r.stores} tienda{r.stores === 1 ? "" : "s"}</small>
                         </div>
                       </div>
@@ -690,12 +702,12 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                       </div>
                       {(r.median || r.ref || r.copiesKnown) && (
                         <dl className="pguide">
-                          {r.median && <div><dt>Mediana publicada</dt><dd>{fmt.format(r.median)}</dd></div>}
+                          {r.median && <div><dt>Mediana publicada</dt><dd>{money(r.median)}</dd></div>}
                           {r.copiesKnown && <div><dt>Copias en stock</dt><dd>{r.copies}</dd></div>}
                           {r.ref && (
                             <div title="Precio de mercado en TCGplayer (Estados Unidos), sin envío ni impuestos de importación. Es solo una referencia para saber si un precio está muy alto o muy bajo.">
                               <dt>Referencia TCGplayer (EE. UU.)</dt>
-                              <dd>{fmtUsd.format(r.ref)}{usd && <small> ≈ {fmt.format(Math.round(r.ref * usd.venta))}</small>}</dd>
+                              <dd>{cur === "USD" || !usd ? fmtUsd.format(r.ref) : fmt.format(Math.round(r.ref * usd.venta))}{usd && <small> ≈ {cur === "USD" ? fmt.format(Math.round(r.ref * usd.venta)) : fmtUsd.format(r.ref)}</small>}</dd>
                             </div>
                           )}
                         </dl>
@@ -715,9 +727,15 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                       <div className="card-actions">
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => addToList(r)}><span>⭐<span className="lg"> Agregar a mi</span> lista</span></button>
                         <button type="button" className="btn btn-ghost btn-sm" onClick={() => shareCard(r)}>Compartir</button>
+                        <button type="button" className="btn btn-ghost btn-sm" aria-expanded={cmpOpen} onClick={() => { setCmpTouched(true); const n = new Set(cmpTouched ? cmp : rows.filter((x, i) => i === 0 && x.exact).map((x) => x.key)); if (n.has(r.key)) n.delete(r.key); else n.add(r.key); setCmp(n); }}><span>🌎<span className="lg"> Comparar</span> precio</span></button>
                         <button type="button" className="btn btn-ghost btn-sm" aria-expanded={hist === r.key} onClick={() => setHist(hist === r.key ? null : r.key)}>📈 Historial</button>
                       </div>
                       {hist === r.key && <PriceHistory game={game} cardKey={r.key} />}
+                      {cmpOpen && (
+                        <PriceCompare game={game} name={r.name} rarity={r.rarity} version={r.version} info={r.info}
+                          local={r.hasAvail ? r.min : null} median={r.median} stores={r.stores} currency={cur}
+                          rates={{ usdArs: usd?.venta ?? null, eurUsd: usd?.eurUsd ?? null }} />
+                      )}
                       <div className="offers" role="table" aria-label={`Comparación de precios de ${r.name}`}>
                         <div className="offer offer-head" role="row" aria-hidden="true">
                           <span>Tienda</span><span>Publicación</span><span>Stock</span><span>Precio</span><span />
@@ -746,9 +764,9 @@ export function App({ initialGame, initialQuery, intro }: { initialGame?: Game; 
                               </div>
                               <div className={`o-stock ${st.cls}`} role="cell">{st.text}</div>
                               <div className="o-price" role="cell">
-                                <b>{fmt.format(l.price)}</b>
-                                {l.cashPrice && <small>{fmt.format(l.cashPrice)} {l.cashLabel}</small>}
-                                {usdOf(l.price) && <small className="usd">≈ {usdOf(l.price)}</small>}
+                                <b>{money(l.price)}</b>
+                                {l.cashPrice && <small>{money(l.cashPrice)} {l.cashLabel}</small>}
+                                {moneyAlt(l.price) && <small className="usd">≈ {moneyAlt(l.price)}</small>}
                               </div>
                               <div className="o-actions" role="cell">
                                 <a className="o-go" href={l.url} target="_blank" rel="noopener" onClick={() => trackClick(game, l.storeId)}>Ver publicación</a>

@@ -19,7 +19,7 @@ export default async function Estado() {
   } catch (e) {
     err = (e as Error).message;
   }
-  const live = STORES.filter((s) => s.platform === "woocommerce" || s.platform === "shopify" || s.platform === "casco").filter((s) => s.mode !== "index");
+  const live = STORES.filter((s) => s.platform === "woocommerce" || s.platform === "shopify" || s.platform === "casco" || s.platform === "empretienda" || s.platform === "garden" || s.platform === "workshop").filter((s) => s.mode !== "index");
   return (
     <div className="app" data-game="digi">
       <main className="wrap guide">
