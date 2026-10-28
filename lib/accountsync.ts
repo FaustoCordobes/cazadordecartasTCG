@@ -8,7 +8,7 @@ import { itemKey, type WishItem, type WishList, type WishState } from "./wishlis
  */
 
 /** Claves de localStorage que se guardan en la cuenta (opciones del plan, envíos por tienda, provincia) */
-export const SYNC_KEYS = ["cazacartas:plan-prefs", "cazacartas:envios", "cazacartas:provincia"] as const;
+export const SYNC_KEYS = ["cazacartas:plan-prefs", "cazacartas:envios", "cazacartas:provincia", "cazacartas:moneda", "cazacartas:calculadora"] as const;
 
 const key = (it: WishItem) => itemKey(it.game, it.name, it.code, it.rarity, it.version);
 

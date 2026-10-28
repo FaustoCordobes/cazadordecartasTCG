@@ -12,6 +12,8 @@ export interface Dolar {
   venta: number;
   fecha: string;
   fuente: string;
+  /** cuántos dólares vale un euro (para pasar precios de Cardmarket); se calcula con las cotizaciones oficiales */
+  eurUsd?: number;
 }
 
 const cache = new TTLCache<Dolar | null>(60 * 60 * 1000);
@@ -38,6 +40,17 @@ export async function getDolar(): Promise<Dolar | null> {
     out = parseDolar(tipo, await getJSON(`https://dolarapi.com/v1/dolares/${tipo}`, 5000));
   } catch {
     out = null;
+  }
+  // Euro: relación euro/dólar con las dos cotizaciones oficiales (si falla, los precios en euros se muestran en euros)
+  if (out) {
+    try {
+      const [eur, usd] = await Promise.all([
+        getJSON<{ venta?: number }>("https://dolarapi.com/v1/cotizaciones/eur", 5000),
+        getJSON<{ venta?: number }>("https://dolarapi.com/v1/dolares/oficial", 5000),
+      ]);
+      const r = eur.venta && usd.venta ? eur.venta / usd.venta : NaN;
+      if (r > 0.5 && r < 2) out.eurUsd = Math.round(r * 10000) / 10000; // descarta datos absurdos
+    } catch { /* sin euro */ }
   }
   cache.set(tipo, out);
   return out;

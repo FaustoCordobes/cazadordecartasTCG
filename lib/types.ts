@@ -2,7 +2,7 @@
 export type Game = "ygo" | "digi" | "mtg" | "pkm" | "op";
 
 /** Plataformas con adaptador. "auto" = se detecta sola la primera vez. */
-export type Platform = "woocommerce" | "shopify" | "tiendanube" | "prestashop" | "casco" | "auto";
+export type Platform = "woocommerce" | "shopify" | "tiendanube" | "prestashop" | "casco" | "empretienda" | "garden" | "workshop" | "auto";
 
 /** live = se consulta en cada búsqueda; index = se recorre su catálogo una vez por día */
 export type Mode = "live" | "index";
@@ -91,6 +91,29 @@ export interface CardInfo {
    * rareza normalizada (Yu-Gi-Oh!), normal/parallel (One Piece).
    */
   ref?: { src: string; prices: Record<string, number> };
+  /** Precios en otros sitios (comparador internacional). Ver lib/worldprice.ts */
+  market?: MarketPrices;
+}
+
+/** Precios de una variante en un sitio (lo que el sitio publique) */
+export interface PriceSet { market?: number; low?: number; mid?: number; high?: number; trend?: number; avg?: number }
+
+/**
+ * Precios de la carta en sitios internacionales, tomados de las bases públicas de cartas
+ * (Scryfall, YGOPRODeck, Pokémon TCG API, OPTCG API), que los publican junto con cada carta.
+ * Las claves de cada sitio son las variantes (las mismas que ref.prices); "any" = cualquier impresión.
+ */
+export interface MarketPrices {
+  /** TCGplayer, EE. UU. (dólares) */
+  tcg?: Record<string, PriceSet>;
+  /** Cardmarket, Europa (euros) */
+  cm?: Record<string, PriceSet>;
+  /** otros sitios de EE. UU. (dólares), precio de la carta en general */
+  others?: { name: string; usd: number }[];
+  tcgUrl?: string;
+  cmUrl?: string;
+  /** sitios cuyo precio es de la carta en general (la impresión más barata) y no de esa versión */
+  cardLevel?: ("tcg" | "cm")[];
 }
 
 export interface Listing extends RawListing {

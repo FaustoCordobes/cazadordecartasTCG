@@ -60,6 +60,28 @@ export const STORES: StoreConfig[] = [
     platform: "casco", games: ["ygo", "digi", "mtg", "pkm", "op"], gameIds: { mtg: 1, ygo: 4, pkm: 5, digi: 8, op: 15 }, city: "Rosario", province: "Santa Fe",
     hasLocal: true, instagram: "cascotcg",
   },
+  {
+    // Empretienda. Catálogo web: el pago y el envío se coordinan por Instagram. Retiro en un punto de encuentro (no es un local).
+    id: "tiendaygo", name: "TiendaYGO", domain: "ygo.com.ar", base: "https://ygo.com.ar",
+    platform: "empretienda", games: ["ygo", "pkm", "op"], city: "CABA (Almagro, punto de encuentro)", province: "CABA",
+    hasLocal: false, instagram: "yugioh_argentina_cards",
+  },
+  {
+    // Empretienda. Cartas sueltas de One Piece y Magic (también Riftbound, que la app todavía no tiene)
+    id: "5alacara", name: "5 A La Cara", domain: "5alacara.com.ar", base: "https://www.5alacara.com.ar",
+    platform: "empretienda", games: ["op", "mtg"], city: "CABA (Monserrat)", province: "CABA", hasLocal: true,
+    address: "Salta 121, Monserrat",
+  },
+  {
+    // Web propia de Yu-Gi-Oh! con catálogo público (api.gardentcg.com.ar)
+    id: "garden", name: "GardenTCG", domain: "gardentcg.com.ar", base: "https://gardentcg.com.ar",
+    platform: "garden", games: ["ygo"], city: null, province: null, hasLocal: false, instagram: "gardentcg",
+  },
+  {
+    // Web propia de Magic; precios en dólares a la cotización de la tienda
+    id: "workshop", name: "La Workshop TCG", domain: "laworkshoptcg.com", base: "https://laworkshoptcg.com",
+    platform: "workshop", games: ["mtg"], city: "Buenos Aires", province: null, hasLocal: false, instagram: "laworkshoptcg",
+  },
 
   // ---------- Indexadas (Tiendanube) ----------
   {
@@ -100,6 +122,12 @@ export const STORES: StoreConfig[] = [
     id: "confluencia", name: "Confluencia TCG", domain: "confluenciatcg.mitiendanube.com", base: "https://confluenciatcg.mitiendanube.com",
     platform: "tiendanube", games: ["ygo"], city: "Neuquén", province: "Neuquén", hasLocal: true, instagram: "confluenciatcg",
     categories: { ygo: ["/ygo/"] },
+  },
+  {
+    // Tiendanube: su robots.txt bloquea el buscador; se lee la categoría de singles una vez por día
+    id: "chainlink", name: "ChainlinkTCG", domain: "chainlinktcg.mitiendanube.com", base: "https://chainlinktcg.mitiendanube.com",
+    platform: "tiendanube", games: ["ygo"], city: "CABA (retiro por depósito)", province: "CABA", hasLocal: false,
+    categories: { ygo: ["/singles/"] },
   },
   {
     id: "duelistcity", name: "Duelist City", domain: "duelistcity.com.ar", base: "https://www.duelistcity.com.ar",

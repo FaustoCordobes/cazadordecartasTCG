@@ -28,6 +28,18 @@ export interface LinkStore {
 
 export const LINK_STORES: LinkStore[] = [
   {
+    id: "surtcg", name: "Sur TCG", url: "https://www.surtcg.com.ar", games: ["pkm"],
+    kind: "tienda", city: "Quilmes", province: "Buenos Aires", hasLocal: true,
+    gameUrls: { pkm: "https://www.surtcg.com.ar/tienda?categoria=pokemon" },
+    note: "Web propia con pocas cartas sueltas; su robots.txt no permite leer su API",
+  },
+  {
+    id: "sylvancards", name: "SylvanCards", url: "https://sylvancards.com", games: ["pkm", "mtg", "ygo", "digi", "op"],
+    kind: "marketplace", city: "Rosario", province: "Santa Fe", hasLocal: false,
+    gameUrls: { pkm: "https://sylvancards.com/cartas?game=pokemon", mtg: "https://sylvancards.com/cartas?game=magic", ygo: "https://sylvancards.com/cartas?game=yugioh", digi: "https://sylvancards.com/cartas?game=digimon", op: "https://sylvancards.com/cartas?game=one-piece" },
+    note: "Marketplace: venden personas y tiendas, cada una por su cuenta",
+  },
+  {
     id: "phoenix", name: "Phoenix Reborn", url: "https://phoenixreborn.com.ar", games: ["ygo", "digi", "pkm", "op"],
     kind: "tienda", city: "CABA (Villa Devoto)", province: "CABA", hasLocal: true, instagram: "phoenixrebornstore",
     searchUrl: "https://phoenixreborn.com.ar/?s={q}&post_type=product",
@@ -103,7 +115,7 @@ export const LINK_STORES: LinkStore[] = [
 ];
 
 /** Fecha de la última revisión manual del directorio (webs, juegos, robots.txt) */
-export const DIRECTORY_REVIEWED = "2026-10-23";
+export const DIRECTORY_REVIEWED = "2026-10-27";
 
 /** Link para buscar una carta en una tienda del directorio (o su página del juego) */
 export function linkFor(s: LinkStore, game: Game, q?: string): string {

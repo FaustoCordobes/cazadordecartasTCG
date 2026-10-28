@@ -3,7 +3,7 @@ import { getText } from "./http.ts";
 import { TTLCache } from "./cache.ts";
 import { robotsAllows } from "./robots.ts";
 
-export type Detected = Exclude<Platform, "auto"> | "empretienda" | "desconocida" | "sin-conexion";
+export type Detected = Exclude<Platform, "auto"> | "desconocida" | "sin-conexion";
 
 const cache = new TTLCache<Detected>(24 * 60 * 60 * 1000);
 /** Tiendas cuya web no respondió: no se vuelven a intentar por 15 minutos (antes cada carta de un
@@ -41,7 +41,7 @@ export async function detectPlatform(store: StoreConfig): Promise<Detected> {
 /** live para lo que tiene buscador consultable, index para el resto */
 export function modeFor(store: StoreConfig, platform: Detected): "live" | "index" | null {
   if (store.mode) return store.mode;
-  if (platform === "woocommerce" || platform === "shopify" || platform === "casco") return "live";
+  if (platform === "woocommerce" || platform === "shopify" || platform === "casco" || platform === "empretienda" || platform === "garden" || platform === "workshop") return "live";
   if (platform === "tiendanube" || platform === "prestashop") return "index";
   return null;
 }

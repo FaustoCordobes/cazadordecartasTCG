@@ -1,4 +1,4 @@
-import type { CardInfo, Game } from "./types.ts";
+import type { CardInfo, Game, MarketPrices, PriceSet } from "./types.ts";
 import { getJSON, HttpError } from "./http.ts";
 import { TTLCache } from "./cache.ts";
 import { norm } from "./parse.ts";
@@ -101,6 +101,7 @@ export interface YgoApiCard {
   level?: number;
   linkval?: number;
   card_sets?: { set_code: string; set_rarity: string; set_price?: string }[];
+  card_prices?: { cardmarket_price?: string; tcgplayer_price?: string; ebay_price?: string; amazon_price?: string; coolstuffinc_price?: string }[];
 }
 
 /** Número positivo o nada (las bases a veces mandan "0.00" o null cuando no hay precio) */
@@ -109,6 +110,45 @@ const price = (v: unknown): number | null => {
   return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
 };
 const TCGP = "TCGplayer";
+
+/** Junta dos fichas de precios quedándose con el menor de cada dato (para "la impresión más barata de la edición") */
+function minMarket(a: MarketPrices | undefined, b: MarketPrices | undefined): MarketPrices | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const merge = (x?: Record<string, PriceSet>, y?: Record<string, PriceSet>) => {
+    if (!x) return y;
+    if (!y) return x;
+    const out: Record<string, PriceSet> = { ...x };
+    for (const [k, v] of Object.entries(y)) {
+      const cur = { ...(out[k] ?? {}) };
+      for (const [f, n] of Object.entries(v) as [keyof PriceSet, number][]) if (n && (!cur[f] || n < cur[f]!)) cur[f] = n;
+      out[k] = cur;
+    }
+    return out;
+  };
+  return { ...a, tcg: merge(a.tcg, b.tcg), cm: merge(a.cm, b.cm) };
+}
+
+/** Yu-Gi-Oh!: precios de la carta en general (YGOPRODeck los publica por carta, no por impresión) */
+function ygoCardMarket(c: YgoApiCard): MarketPrices | undefined {
+  const p = c.card_prices?.[0];
+  if (!p) return undefined;
+  const others = ([["eBay", p.ebay_price], ["Amazon", p.amazon_price], ["CoolStuffInc", p.coolstuffinc_price]] as const)
+    .map(([name, v]) => ({ name, usd: price(v) }))
+    .filter((x): x is { name: "eBay" | "Amazon" | "CoolStuffInc"; usd: number } => !!x.usd);
+  const tcg = price(p.tcgplayer_price);
+  const cm = price(p.cardmarket_price);
+  if (!tcg && !cm && !others.length) return undefined;
+  const q = encodeURIComponent(c.name);
+  return {
+    tcg: tcg ? { any: { market: tcg } } : undefined,
+    cm: cm ? { any: { trend: cm } } : undefined,
+    others,
+    tcgUrl: `https://www.tcgplayer.com/search/yugioh/product?q=${q}`,
+    cmUrl: `https://www.cardmarket.com/es/YuGiOh/Products/Search?searchString=${q}`,
+    cardLevel: ["tcg", "cm"],
+  };
+}
 
 export function ygoInfo(c: YgoApiCard): CardInfo {
   if (c.frameType === "spell" || c.frameType === "trap") {
@@ -139,7 +179,8 @@ async function ygoLookup(name: string): Promise<InfoIndex> {
     if (!(e instanceof HttpError)) throw e; // 400 = sin resultados
   }
   for (const c of cards.slice(0, 40)) {
-    const info = ygoInfo(c);
+    const cardMarket = ygoCardMarket(c);
+    const info = { ...ygoInfo(c), market: cardMarket };
     idx.byName.set(norm(c.name), info);
     // Precio de referencia por código y rareza (el mismo código puede salir en varias rarezas)
     const byCode = new Map<string, Record<string, number>>();
@@ -149,7 +190,15 @@ async function ygoLookup(name: string): Promise<InfoIndex> {
       const p = price(s.set_price);
       if (p) byCode.get(code)![norm(s.set_rarity)] = p;
     }
-    for (const [code, prices] of byCode) idx.byCode.set(code, Object.keys(prices).length ? { ...info, ref: { src: TCGP, prices } } : info);
+    for (const [code, prices] of byCode) {
+      if (!Object.keys(prices).length) { idx.byCode.set(code, info); continue; }
+      // TCGplayer de esa impresión (por rareza); Cardmarket y los otros, de la carta en general
+      const tcg = Object.fromEntries(Object.entries(prices).map(([k, v]) => [k, { market: v }]));
+      const market: MarketPrices = { ...(cardMarket ?? {}), tcg, cardLevel: ["cm"],
+        tcgUrl: `https://www.tcgplayer.com/search/yugioh/product?q=${encodeURIComponent(c.name)}`,
+        cmUrl: cardMarket?.cmUrl ?? `https://www.cardmarket.com/es/YuGiOh/Products/Search?searchString=${encodeURIComponent(c.name)}` };
+      idx.byCode.set(code, { ...info, ref: { src: TCGP, prices }, market });
+    }
   }
   return idx;
 }
@@ -174,7 +223,8 @@ export interface ScryfallCard {
   cmc?: number;
   image_uris?: { small?: string };
   card_faces?: { type_line?: string; colors?: string[]; image_uris?: { small?: string } }[];
-  prices?: { usd?: string | null; usd_foil?: string | null; usd_etched?: string | null };
+  prices?: { usd?: string | null; usd_foil?: string | null; usd_etched?: string | null; eur?: string | null; eur_foil?: string | null };
+  purchase_uris?: { tcgplayer?: string; cardmarket?: string };
 }
 
 export function mtgInfo(c: ScryfallCard): CardInfo {
@@ -191,6 +241,26 @@ export function mtgInfo(c: ScryfallCard): CardInfo {
     setName: c.set_name,
     image: c.image_uris?.small ?? c.card_faces?.[0]?.image_uris?.small,
     ...mtgRef(c),
+    market: mtgMarket(c),
+  };
+}
+
+function mtgMarket(c: ScryfallCard): MarketPrices | undefined {
+  const n = price(c.prices?.usd), f = price(c.prices?.usd_foil) ?? price(c.prices?.usd_etched);
+  const en = price(c.prices?.eur), ef = price(c.prices?.eur_foil);
+  if (!n && !f && !en && !ef) return undefined;
+  const tcg: Record<string, PriceSet> = {}, cm: Record<string, PriceSet> = {};
+  if (n) tcg.normal = { market: n };
+  if (f) tcg.foil = { market: f };
+  if (en) cm.normal = { trend: en };
+  if (ef) cm.foil = { trend: ef };
+  const q = encodeURIComponent(c.name);
+  return {
+    tcg: Object.keys(tcg).length ? tcg : undefined,
+    cm: Object.keys(cm).length ? cm : undefined,
+    // los links de compra de Scryfall llevan a la impresión exacta; si no están, a la búsqueda
+    tcgUrl: c.purchase_uris?.tcgplayer ?? `https://www.tcgplayer.com/search/magic/product?q=${q}`,
+    cmUrl: c.purchase_uris?.cardmarket ?? `https://www.cardmarket.com/es/Magic/Products/Search?searchString=${q}`,
   };
 }
 
@@ -231,12 +301,13 @@ async function mtgLookup(name: string): Promise<InfoIndex> {
       if (!prev) { idx.byCode.set(k, info); continue; }
       const pp = { ...(prev.ref?.prices ?? {}) };
       for (const [kk, v] of Object.entries(info.ref?.prices ?? {})) if (!pp[kk] || v < pp[kk]) pp[kk] = v;
-      if (Object.keys(pp).length) idx.byCode.set(k, { ...prev, ref: { src: TCGP, prices: pp } });
+      const market = minMarket(prev.market, info.market);
+      idx.byCode.set(k, { ...prev, ...(Object.keys(pp).length ? { ref: { src: TCGP, prices: pp } } : {}), market });
     }
     // por nombre se guarda la impresión sin rareza (cambia entre impresiones)
-    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined, ref: undefined });
+    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined, ref: undefined, market: undefined });
     // las cartas de dos caras también se encuentran por cada cara
-    for (const face of c.name.split(" // ")) if (!idx.byName.has(norm(face))) idx.byName.set(norm(face), { ...info, name: c.name, rarity: undefined, setName: undefined, ref: undefined });
+    for (const face of c.name.split(" // ")) if (!idx.byName.has(norm(face))) idx.byName.set(norm(face), { ...info, name: c.name, rarity: undefined, setName: undefined, ref: undefined, market: undefined });
   }
   return idx;
 }
@@ -272,7 +343,8 @@ export interface PkmApiCard {
   number: string;
   set: { id: string; name: string; printedTotal: number; ptcgoCode?: string };
   images?: { small?: string };
-  tcgplayer?: { prices?: Record<string, { market?: number | null; mid?: number | null } | undefined> };
+  tcgplayer?: { url?: string; prices?: Record<string, { market?: number | null; mid?: number | null; low?: number | null; high?: number | null } | undefined> };
+  cardmarket?: { url?: string; prices?: Record<string, number | null | undefined> };
 }
 
 export function pkmInfo(c: PkmApiCard): CardInfo {
@@ -289,6 +361,36 @@ export function pkmInfo(c: PkmApiCard): CardInfo {
     setName: c.set.name,
     image: c.images?.small,
     ...pkmRef(c),
+    market: pkmMarket(c),
+  };
+}
+
+function pkmMarket(c: PkmApiCard): MarketPrices | undefined {
+  const tcg: Record<string, PriceSet> = {};
+  for (const [k, v] of Object.entries(c.tcgplayer?.prices ?? {})) {
+    if (!v) continue;
+    const set: PriceSet = {};
+    for (const f of ["market", "low", "mid", "high"] as const) { const x = price(v[f]); if (x) set[f] = x; }
+    if (Object.keys(set).length) tcg[k] = set;
+  }
+  const p = c.cardmarket?.prices ?? {};
+  const cm: Record<string, PriceSet> = {};
+  const normal: PriceSet = {}, rev: PriceSet = {};
+  if (price(p.trendPrice)) normal.trend = price(p.trendPrice)!;
+  if (price(p.averageSellPrice)) normal.avg = price(p.averageSellPrice)!;
+  if (price(p.lowPrice)) normal.low = price(p.lowPrice)!;
+  if (price(p.reverseHoloTrend)) rev.trend = price(p.reverseHoloTrend)!;
+  if (price(p.reverseHoloSell)) rev.avg = price(p.reverseHoloSell)!;
+  if (price(p.reverseHoloLow)) rev.low = price(p.reverseHoloLow)!;
+  if (Object.keys(normal).length) { cm.normal = normal; cm.holofoil = normal; }
+  if (Object.keys(rev).length) cm.reverseHolofoil = rev;
+  if (!Object.keys(tcg).length && !Object.keys(cm).length) return undefined;
+  const q = encodeURIComponent(c.name);
+  return {
+    tcg: Object.keys(tcg).length ? tcg : undefined,
+    cm: Object.keys(cm).length ? cm : undefined,
+    tcgUrl: c.tcgplayer?.url ?? `https://www.tcgplayer.com/search/pokemon/product?q=${q}`,
+    cmUrl: c.cardmarket?.url ?? `https://www.cardmarket.com/es/Pokemon/Products/Search?searchString=${q}`,
   };
 }
 
@@ -309,7 +411,7 @@ async function pkmLookup(name: string): Promise<InfoIndex> {
   try {
     const q = words.map((w) => `name:"${w}*"`).join(" ");
     const data = await getJSON<{ data: PkmApiCard[] }>(
-      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=150&orderBy=-set.releaseDate&select=id,name,supertype,subtypes,types,rarity,number,set,images,tcgplayer`,
+      `https://api.pokemontcg.io/v2/cards?q=${encodeURIComponent(q)}&pageSize=150&orderBy=-set.releaseDate&select=id,name,supertype,subtypes,types,rarity,number,set,images,tcgplayer,cardmarket`,
       12000
     );
     cards = data.data ?? [];
@@ -320,7 +422,7 @@ async function pkmLookup(name: string): Promise<InfoIndex> {
     const info = pkmInfo(c);
     idx.byCode.set(`${c.number}/${c.set.printedTotal}`.toUpperCase(), info);
     idx.byCode.set(c.number.toUpperCase().replace(/\s/g, ""), info); // promos: SWSH001, SVP050
-    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined, ref: undefined });
+    if (!idx.byName.has(norm(c.name))) idx.byName.set(norm(c.name), { ...info, rarity: undefined, setName: undefined, ref: undefined, market: undefined });
   }
   return idx;
 }
@@ -380,7 +482,14 @@ async function opLookup(name: string): Promise<InfoIndex> {
       const p = price(c.market_price);
       if (p && !prices[parallel ? "parallel" : "normal"]) prices[parallel ? "parallel" : "normal"] = p;
       const base = !prev || !parallel ? info : prev;
-      idx.byCode.set(code, Object.keys(prices).length ? { ...base, ref: { src: TCGP, prices } } : base);
+      const market: MarketPrices | undefined = Object.keys(prices).length
+        ? {
+            tcg: Object.fromEntries(Object.entries(prices).map(([k, v]) => [k, { market: v }])),
+            tcgUrl: `https://www.tcgplayer.com/search/one-piece-card-game/product?q=${encodeURIComponent(info.name)}`,
+            cmUrl: `https://www.cardmarket.com/es/OnePiece/Products/Search?searchString=${encodeURIComponent(info.name)}`,
+          }
+        : undefined;
+      idx.byCode.set(code, Object.keys(prices).length ? { ...base, ref: { src: TCGP, prices }, market } : base);
       if (!idx.byName.has(norm(info.name))) idx.byName.set(norm(info.name), { ...info, rarity: undefined, setName: undefined, image: undefined });
     }
   }
