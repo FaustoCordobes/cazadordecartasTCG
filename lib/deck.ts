@@ -2,6 +2,7 @@ import type { DeckEntry } from "./decklist.ts";
 import type { Game, SearchResponse } from "./types.ts";
 import { norm } from "./parse.ts";
 import { GAMES } from "./games.ts";
+import { refUsd } from "./refprice.ts";
 
 /** Una publicación que sirve para una carta del mazo */
 export interface DeckOffer {
@@ -36,6 +37,8 @@ export interface DeckCard {
   offers: DeckOffer[];
   /** publicaciones agotadas (para mostrar que existe) */
   outOfStock: number;
+  /** precio de referencia TCGplayer (dólares) de la versión más barata encontrada, si hay dato */
+  refUsd?: number | null;
 }
 
 /**
@@ -110,7 +113,11 @@ export function matchEntry(game: Game, entry: DeckEntry, res: SearchResponse): D
   if (!res.known && !pool.length) {
     error = `No reconocimos "${entry.raw.trim()}". Revisá cómo está escrito el nombre${game === "digi" || game === "op" ? " y el código" : ""}, por ejemplo: ${GAMES[game].deckHint}`;
   }
-  return { entry, name, known: res.known || pool.length > 0, error, offers, outOfStock };
+  // Referencia internacional: la de la versión más barata que se puede comprar (si ninguna tiene stock, la menor que haya)
+  const refs = pool.map((g) => ({ g, ref: refUsd(game, g), min: Math.min(...g.listings.filter((l) => l.available !== false).map((l) => l.price)) }))
+    .filter((x) => x.ref);
+  const cheapest = refs.sort((a, b) => a.min - b.min || a.ref! - b.ref!)[0];
+  return { entry, name, known: res.known || pool.length > 0, error, offers, outOfStock, refUsd: cheapest?.ref ?? null };
 }
 
 /** "BT-20: Over the X" → "BT20", "BT20" → "BT20", "OP-01 Romance Dawn" → "OP01", "EX6" → "EX6" */
