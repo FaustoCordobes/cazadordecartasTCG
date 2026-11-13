@@ -21,7 +21,12 @@ export const STORES: StoreConfig[] = [
     instagram: "ranchodelprofesor", cashDiscount: { percent: 10, label: "en efectivo" },
     wooCategory: { digi: "digimon", op: "one-piece", pkm: "pokemon", mtg: "magic" },
   },
-  // Phoenix Reborn pasó a "búsqueda manual" (lib/linkstores.ts): su Cloudflare responde 403 a los servidores.
+  {
+    // Su web tiene Cloudflare (403 a servidores): Digimon se lee de la API pública de Phoenix Arena,
+    // su web de torneos (ver lib/adapters/phoenix.ts). Los otros juegos siguen en lib/linkstores.ts.
+    id: "phoenix", name: "Phoenix Reborn", domain: "phoenixreborn.com.ar", base: "https://phoenixreborn.com.ar",
+    platform: "phoenix", games: ["digi"], city: "CABA (Villa Devoto)", province: "CABA", hasLocal: true, instagram: "phoenixrebornstore",
+  },
   {
     id: "gravedad", name: "Gravedad", domain: "gravedad.com.ar", base: "https://gravedad.com.ar",
     platform: "woocommerce", games: ["mtg", "pkm", "op", "digi"], city: "José C. Paz", province: "Buenos Aires", hasLocal: true,

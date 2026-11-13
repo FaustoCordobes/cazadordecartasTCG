@@ -41,7 +41,7 @@ export async function detectPlatform(store: StoreConfig): Promise<Detected> {
 /** live para lo que tiene buscador consultable, index para el resto */
 export function modeFor(store: StoreConfig, platform: Detected): "live" | "index" | null {
   if (store.mode) return store.mode;
-  if (platform === "woocommerce" || platform === "shopify" || platform === "casco" || platform === "empretienda" || platform === "garden" || platform === "workshop") return "live";
+  if (platform === "woocommerce" || platform === "shopify" || platform === "casco" || platform === "empretienda" || platform === "garden" || platform === "workshop" || platform === "phoenix") return "live";
   if (platform === "tiendanube" || platform === "prestashop") return "index";
   return null;
 }

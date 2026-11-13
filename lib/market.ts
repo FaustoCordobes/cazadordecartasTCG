@@ -71,6 +71,15 @@ export async function marketData(game: Game, days = 3) {
   return {
     ofertas: o.status === "fulfilled" && Array.isArray(o.value) ? o.value : [],
     ...(m.status === "fulfilled" && Array.isArray(m.value) ? pickMovers(m.value) : { suben: [], bajan: [] }),
-    error: o.status === "rejected" || m.status === "rejected" ? "Falta correr la migración 003 en Supabase" : null,
+    error: o.status === "rejected" || m.status === "rejected" ? marketError(o.status === "rejected" ? o.reason : (m as PromiseRejectedResult).reason) : null,
   };
+}
+
+/** Mensaje claro según lo que respondió Supabase (sin exponer claves) */
+export function marketError(reason: unknown): string {
+  const msg = String((reason as Error)?.message ?? reason ?? "");
+  if (/abort/i.test(msg)) return "Supabase tardó demasiado en responder. Probá de nuevo en un rato.";
+  if (/\b(401|403)\b|permission denied|42501/i.test(msg)) return "Supabase no da permiso a las tablas de ofertas: falta correr los permisos (GRANT) de la migración 003.";
+  if (/PGRST20[0-9]|42P01|42883|does not exist|schema cache|\b404\b/i.test(msg)) return "Supabase todavía no ve las tablas de la migración 003 (corré la migración y después: NOTIFY pgrst, 'reload schema').";
+  return "No se pudieron leer las ofertas de Supabase: " + msg.replace(/sb_[a-z]+_[A-Za-z0-9_-]+/g, "***").slice(0, 160);
 }

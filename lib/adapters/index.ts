@@ -5,6 +5,7 @@ import { searchCasco, cascoPath } from "./casco.ts";
 import { searchEmpretienda, empretiendaPath } from "./empretienda.ts";
 import { searchGarden, gardenPath } from "./garden.ts";
 import { searchWorkshop, workshopPath } from "./workshop.ts";
+import { searchPhoenix, phoenixPath, codesIn } from "./phoenix.ts";
 
 type LiveAdapter = {
   search: (s: StoreConfig, q: string, game: Game) => Promise<RawListing[]>;
@@ -20,4 +21,5 @@ export const LIVE_ADAPTERS: Partial<Record<string, LiveAdapter>> = {
   empretienda: { search: (s, q) => searchEmpretienda(s, q), path: (q) => empretiendaPath(q) },
   garden: { search: searchGarden, path: (q) => gardenPath(q) },
   workshop: { search: searchWorkshop, path: (q) => workshopPath(q) },
+  phoenix: { search: searchPhoenix, path: (q) => phoenixPath(codesIn(q)) },
 };

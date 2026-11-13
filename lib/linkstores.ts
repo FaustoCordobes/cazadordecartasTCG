@@ -40,7 +40,8 @@ export const LINK_STORES: LinkStore[] = [
     note: "Marketplace: venden personas y tiendas, cada una por su cuenta",
   },
   {
-    id: "phoenix", name: "Phoenix Reborn", url: "https://phoenixreborn.com.ar", games: ["ygo", "digi", "pkm", "op"],
+    // Digimon ya se busca en vivo (lib/stores.ts, vía Phoenix Arena); el resto sigue con búsqueda manual
+    id: "phoenix-web", name: "Phoenix Reborn", url: "https://phoenixreborn.com.ar", games: ["ygo", "pkm", "op"],
     kind: "tienda", city: "CABA (Villa Devoto)", province: "CABA", hasLocal: true, instagram: "phoenixrebornstore",
     searchUrl: "https://phoenixreborn.com.ar/?s={q}&post_type=product",
     note: "Su protección anti-bots (Cloudflare) bloquea las consultas automáticas: buscá en su web",

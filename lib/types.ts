@@ -2,7 +2,7 @@
 export type Game = "ygo" | "digi" | "mtg" | "pkm" | "op";
 
 /** Plataformas con adaptador. "auto" = se detecta sola la primera vez. */
-export type Platform = "woocommerce" | "shopify" | "tiendanube" | "prestashop" | "casco" | "empretienda" | "garden" | "workshop" | "auto";
+export type Platform = "woocommerce" | "shopify" | "tiendanube" | "prestashop" | "casco" | "empretienda" | "garden" | "workshop" | "phoenix" | "auto";
 
 /** live = se consulta en cada búsqueda; index = se recorre su catálogo una vez por día */
 export type Mode = "live" | "index";
